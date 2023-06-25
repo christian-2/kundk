@@ -201,7 +201,7 @@ for demo in 1 2; do
     -s directAccessGrantsEnabled=false \
     -s protocol=openid-connect \
     -s publicClient=false \
-    -s 'redirectUris=["https://'$APACHE_HOSTNAME:$((443 + $demo))'/vanity.html"]' \
+    -s 'redirectUris=["https://'$APACHE_HOSTNAME:$((9443 + $demo))'/vanity.html"]' \
     -s 'attributes={"post.logout.redirect.uris":"'https://$APACHE_HOSTNAME'"}' \
     -s standardFlowEnabled=true \
     -s enabled=true

@@ -69,11 +69,11 @@ if [ -z "$OIDC_PASSKEY_DEMO" ]; then
 <h1>oidc-passkey</h1>
 <ul>
 <li>
-  <a href="https://$APACHE_HOSTNAME:$((443 + 1))">demo #1</a>:
+  <a href="https://$APACHE_HOSTNAME:$((9443 + 1))">demo #1</a>:
   authentication: FIDO passkey (1FA); registration: LDAP
 </li>
 <li>
-  <a href="https://$APACHE_HOSTNAME:$((443 + 2))">demo #2</a>:
+  <a href="https://$APACHE_HOSTNAME:$((9443 + 2))">demo #2</a>:
   authentication: LDAP + FIDO passkey (2FA); registration: LDAP
 </li>
 </ul>
@@ -124,7 +124,7 @@ DirectoryIndex index.cgi \
     /usr/local/apache2/conf/httpd.conf
 
   discovery_url=https://$KEYCLOAK_HOSTNAME:8444/realms/$realm/.well-known/openid-configuration
-  redirect_uri=https://$APACHE_HOSTNAME:$((443 + $OIDC_PASSKEY_DEMO))/vanity.html
+  redirect_uri=https://$APACHE_HOSTNAME:$((9443 + $OIDC_PASSKEY_DEMO))/vanity.html
 
   cat >> /usr/local/apache2/conf/httpd.conf << EOF
 
