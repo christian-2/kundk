@@ -1,0 +1,174 @@
+#!/bin/bash
+set -e
+trap 'echo "error: $0:$LINENO"' ERR
+
+# check ENVs
+
+echo "APACHE_HOSTNAME=$APACHE_HOSTNAME"
+echo "APACHE_LOG_LEVEL=$APACHE_LOG_LEVEL"
+echo "APACHE_PORT=$APACHE_PORT"
+echo "KEYCLOAK_HOSTNAME=$KEYCLOAK_HOSTNAME"
+echo "KEYCLOAK_OIDC_REMOTE_USER_CLAIM=$KEYCLOAK_OIDC_REMOTE_USER_CLAIM"
+echo "KEYCLOAK_OIDC_SCOPE=$KEYCLOAK_OIDC_SCOPE"
+echo "OIDC_PASSKEY_DEMO=$OIDC_PASSKEY_DEMO"
+
+re='^[0-9]+$'
+test -n "$APACHE_HOSTNAME"
+test -n "$APACHE_LOG_LEVEL"
+[[ "$APACHE_PORT" =~ $re ]]
+test -n "$KEYCLOAK_HOSTNAME" -o -z "$OIDC_PASSKEY_DEMO"
+test -n "$KEYCLOAK_OIDC_REMOTE_USER_CLAIM" -o -z "$OIDC_PASSKEY_DEMO"
+test -n "$KEYCLOAK_OIDC_SCOPE" -o -z "$OIDC_PASSKEY_DEMO"
+[ -z "$OIDC_PASSKEY_DEMO" ] || [[ "$OIDC_PASSKEY_DEMO" =~ $re ]]
+
+# wait for ACME certificate to have arrived
+
+. /usr/local/bin/state
+
+wait_state CERTIFICATES_READY /mnt/state/state.acme
+
+install -m 644 -o 1000 -g 0 \
+  /mnt/state/${APACHE_HOSTNAME}_fullchain.cer \
+  /usr/local/apache2/conf/server.crt
+install -m 600 -o 1000 -g 0 \
+  /mnt/state/$APACHE_HOSTNAME.key \
+  /usr/local/apache2/conf/server.key
+
+# disable HTTP
+
+sed -i \
+  -e 's/^\(Listen 80\)$/#\1/' \
+  /usr/local/apache2/conf/httpd.conf
+
+# enable HTTPS
+
+sed -i \
+  -e 's/^#\(Include .*httpd-ssl.conf\)/\1/' \
+  -e 's/^#\(LoadModule .*mod_ssl.so\)/\1/' \
+  -e 's/^#\(LoadModule .*mod_socache_shmcb.so\)/\1/' \
+  /usr/local/apache2/conf/httpd.conf
+
+# adjust port
+
+sed -i 's/443/'$APACHE_PORT'/g' /usr/local/apache2/conf/extra/httpd-ssl.conf
+
+if [ -z "$OIDC_PASSKEY_DEMO" ]; then
+
+  # wait for individual demos to have started
+
+  wait_state DEMO_READY /mnt/state/state.demo-1
+  wait_state DEMO_READY /mnt/state/state.demo-2
+	
+  # provide content for landing page
+
+  rm /usr/local/apache2/htdocs/index.html
+
+  install -o www-data -g www-data -m 744 /dev/stdin \
+    /usr/local/apache2/htdocs/index.html << EOF
+<html><body>
+<h1>oidc-passkey</h1>
+<ul>
+<li>
+  <a href="https://$APACHE_HOSTNAME:$((443 + 1))">demo #1</a>:
+  authentication: FIDO passkey (1FA); registration: LDAP
+</li>
+<li>
+  <a href="https://$APACHE_HOSTNAME:$((443 + 2))">demo #2</a>:
+  authentication: LDAP + FIDO passkey (2FA); registration: LDAP
+</li>
+</ul>
+EOF
+
+else
+  realm=oidc-passkey-demo-$OIDC_PASSKEY_DEMO
+
+  # wait for Keycloak to be ready
+
+  wait_state KEYCLOAK_READY /mnt/state/state.keycloak
+
+  # enable CGI
+
+  sed -i \
+    -e 's/#\(LoadModule .*mod_cgi.so\)/\1/' \
+    -e 's/#\(LoadModule .*mod_cgid.so\)/\1/' \
+    /usr/local/apache2/conf/httpd.conf
+
+  # enforce OIDC
+
+  sed -i \
+    -e '$aLoadModule auth_openidc_module /usr/lib/apache2/modules/mod_auth_openidc.so' \
+    /usr/local/apache2/conf/httpd.conf
+
+  # configure logging
+
+  sed -i \
+    -e 's/^\(LogLevel\) .*$/\1 '$APACHE_LOG_LEVEL'/' \
+    /usr/local/apache2/conf/httpd.conf
+
+  # provide configuration and content for specific demo
+
+  rm /usr/local/apache2/htdocs/index.html
+
+  client_secret=$(cat /mnt/state/demo-$OIDC_PASSKEY_DEMO-client-secret)
+  test -n "$client_secret"
+
+  sed -i \
+    -e '\|^<Directory "/usr/local/apache2/htdocs">$|,\|^</Directory>$|c \
+<Directory "/usr/local/apache2/htdocs"> \
+AuthType openid-connect \
+Require valid-user \
+Options +ExecCGI \
+AddHandler cgi-script .cgi \
+DirectoryIndex index.cgi \
+</Directory>' \
+    /usr/local/apache2/conf/httpd.conf
+
+  discovery_url=https://$KEYCLOAK_HOSTNAME:8444/realms/$realm/.well-known/openid-configuration
+  redirect_uri=https://$APACHE_HOSTNAME:$((443 + $OIDC_PASSKEY_DEMO))/vanity.html
+
+  cat >> /usr/local/apache2/conf/httpd.conf << EOF
+
+<IfModule auth_openidc_module>
+OIDCClientID demo-$OIDC_PASSKEY_DEMO-client
+OIDCClientSecret $client_secret
+OIDCCryptoPassphrase $(tr -dc A-Za-z0-9 </dev/urandom | head -c 32)
+OIDCProviderTokenEndpointAuth client_secret_basic
+OIDCProviderMetadataURL $discovery_url
+OIDCRedirectURI $redirect_uri
+OIDCRemoteUserClaim $KEYCLOAK_OIDC_REMOTE_USER_CLAIM
+OIDCScope "$KEYCLOAK_OIDC_SCOPE"
+</IfModule>
+EOF
+
+  end_session_endpoint=$(curl $discovery_url | jq -r .end_session_endpoint)
+  test -n "$end_session_endpoint"
+
+  post_logout_redirect_uri=https://$APACHE_HOSTNAME
+
+  install -o www-data -g www-data -m 744 /dev/stdin \
+    /usr/local/apache2/htdocs/index.cgi << EOF
+#!/bin/bash
+echo 'Content-type: text/html'
+echo
+echo '<html><body>'
+echo '<h1>Demo #$OIDC_PASSKEY_DEMO</h1>'
+echo "<p>Hello \$REMOTE_USER, you are now registered and authenticated.</p>"
+echo '<a href="$redirect_uri?logout=$(printf "$post_logout_redirect_uri" | jq -sRr @uri)">Logout</a>'
+echo '</body></html>'
+EOF
+
+  # provide content for glue
+
+  install -o www-data -g www-data -m 744 /dev/stdin /usr/local/apache2/htdocs/vanity.html << EOF
+<html><body><h1>Internal Error</h1></body></html>
+EOF
+fi
+
+# update state
+
+set_state DEMO_READY /mnt/state/state.demo${OIDC_PASSKEY_DEMO:+-$OIDC_PASSKEY_DEMO}
+
+# start Apache
+
+apachectl -t
+exec httpd-foreground

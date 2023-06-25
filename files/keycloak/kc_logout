@@ -1,0 +1,6 @@
+#!/bin/bash
+set -e
+trap 'echo "error: $0:$LINENO"' ERR
+
+config=/var/run/keycloak/kcadm.config
+rm $config

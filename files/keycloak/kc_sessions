@@ -1,0 +1,122 @@
+#!/bin/bash
+set -e
+trap 'echo "error: $0:$LINENO"' ERR
+
+print_session() {
+  test $# -eq 9 -o $# -eq 12
+
+  realm=$1
+  user_id=$2
+  username=$3
+  credential_id=$4
+  type=$5
+  user_label=$6
+  aaguid=$(/var/lib/keycloak/venv/bin/python /usr/local/bin/fido-mds.py \
+    --aaguid $7)
+  transports=$8
+  created_date=$(date -d @${9::-3} +'%Y-%m-%d %H:%M %Z')
+  if [ $# -eq 9 ]; then
+    ip_address=-
+    start=-
+    client_ids=-
+  else
+    ip_address=${10}
+    start=$(date -d @${11::-3} +'%Y-%m-%d %H:%M %Z')
+    client_ids=${12}
+  fi
+
+  u=user
+  r=registration/credential
+  a=authentication/session
+
+  printf "\n"
+  printf "| scope | property | value |\n"
+  printf "| --- | --- | --- |\n"
+  printf "| $u | realm        | %s |\n" "$realm"
+  printf "| $u | user_id      | %s |\n" "$user_id"
+  printf "| $u | username     | %s |\n" "$username"
+  printf "| $r | credentialId | %s |\n" "$credential_id"
+  printf "| $r | type         | %s |\n" "$type"
+  printf "| $r | userLabel    | %s |\n" "$user_label"
+  printf "| $r | aaguid       | %s |\n" "$aaguid"
+  printf "| $r | transports   | %s |\n" "$transports"
+  printf "| $r | createdDate  | %s |\n" "$created_date"
+  printf "| $a | clients      | %s |\n" "$client_ids"
+  printf "| $a | start        | %s |\n" "$start"
+  printf "| $a | ipAddress    | %s |\n" "$ip_address"
+}
+
+config=/var/run/keycloak/kcadm.config
+test -f $config # i.e. past kc_login
+
+PATH=$PATH:/opt/keycloak/bin
+
+users=$(mktemp)
+credentials=$(mktemp)
+sessions=$(mktemp)
+printf "# WebAuthn sessions\n"
+
+for demo in 1 2; do
+  realm=oidc-passkey-demo-$demo
+  kcadm.sh get --config $config -r $realm \
+    users 2> /dev/null | jq 'sort_by(.username)' > $users
+
+  case $demo in
+  1)
+    type=webauthn-passwordless
+    ;;
+  2)
+    type=webauthn
+    ;;
+  *)
+    exit 1
+  esac
+
+  for user_id in $(cat $users | jq -r '.[] | .id'); do
+    username=$(cat $users | \
+      jq -r --arg id $user_id '.[] | select(.id == $id) | .username')
+
+    kcadm.sh get --config $config -r $realm \
+      users/$user_id/credentials 2> /dev/null > $credentials
+    if jq -e --arg type $type \
+      'any(.type == $type) | not' $credentials > /dev/null; then
+      break;
+    fi
+
+    credential_id=$(jq -r --arg type $type \
+      '.[] | select(.type == $type) | .id' $credentials)
+    user_label=$(jq -r --arg type $type \
+      '.[] | select(.type == $type) | .userLabel' $credentials)
+    created_date=$(jq -r --arg type $type \
+      '.[] | select(.type == $type) | .createdDate' $credentials)
+
+    credentialData=$(jq -r --arg type $type \
+      '.[] | select(.type == $type) | .credentialData' $credentials)
+    aaguid=$(echo $credentialData | jq -r '.aaguid')
+    transports=$(echo $credentialData | jq -r '.transports | .[]' | paste -sd,)
+
+    kcadm.sh get --config $config -r $realm \
+      users/$user_id/sessions 2> /dev/null > $sessions
+    if [ "$(jq '. | length' $sessions)" -eq 0 ]; then
+      print_session \
+        $realm $user_id $username \
+        $credential_id $type "$user_label" $aaguid $transports $created_date
+    else
+      for session_id in $(cat $sessions | jq -r '.[] | .id'); do
+        ip_address=$(jq -r --arg id $session_id \
+          '.[] | select(.id == $id) | .ipAddress' $sessions)
+        start=$(jq -r --arg id $session_id \
+          '.[] | select(.id == $id) | .start' $sessions)
+        client_ids=$(jq -r --arg id $session_id \
+          '.[] | select(.id == $id) | .clients | .[]' $sessions | paste -sd,)
+        print_session \
+         $realm $user_id $username \
+         $credential_id $type "$user_label" $aaguid $transports $created_date \
+         $ip_address $start $client_ids
+      done
+    fi
+  done
+done
+rm $users
+rm $credentials
+rm $sessions

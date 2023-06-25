@@ -1,0 +1,22 @@
+FROM httpd
+
+RUN \
+  apt-get -y update && \
+  apt-get install -y curl jq libapache2-mod-auth-openidc
+
+COPY files/state /usr/local/bin/
+
+STOPSIGNAL SIGWINCH
+
+VOLUME /mnt/state
+
+ENV APACHE_HOSTNAME ""
+ENV APACHE_LOG_LEVEL ""
+ENV APACHE_PORT 443
+ENV KEYCLOAK_HOSTNAME ""
+ENV KEYCLOAK_OIDC_CLIENT_ID ""
+ENV KEYCLOAK_OIDC_REMOTE_USER_CLAIM ""
+ENV KEYCLOAK_OIDC_SCOPE ""
+
+COPY --chown=root:root --chmod=744 files/demo/command /usr/local/bin
+CMD ["command"]

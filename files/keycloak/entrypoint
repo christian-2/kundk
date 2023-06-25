@@ -1,0 +1,267 @@
+#!/bin/bash
+set -e
+trap 'echo "error: $0:$LINENO"' ERR
+
+# check ENVs
+
+echo "APACHE_HOSTNAME=$APACHE_HOSTNAME"
+echo "KEYCLOAK_ADMIN_PASSWORD=$(echo $KEYCLOAK_ADMIN_PASSWORD | sed s/./\*/g)"
+echo "KEYCLOAK_HOSTNAME=$KEYCLOAK_HOSTNAME"
+echo "KEYCLOAK_LOG_LEVEL=$KEYCLOAK_LOG_LEVEL"
+echo "POSTGRES_KEYCLOAK_PASSWORD=$(echo $POSTGRES_KEYCLOAK_PASSWORD | \
+  sed s/./\*/g)"
+
+test -n "$APACHE_HOSTNAME"
+test -n "$KEYCLOAK_ADMIN_PASSWORD"
+test -n "$KEYCLOAK_HOSTNAME"
+test -n "$KEYCLOAK_LOG_LEVEL"
+test -n "$POSTGRES_KEYCLOAK_PASSWORD"
+
+# wait for ACME certificate to have arrived
+
+. /usr/local/bin/state
+
+wait_state CERTIFICATES_READY /mnt/state/state.acme
+
+install -m 644 -o 1000 -g 0 \
+  /mnt/state/${KEYCLOAK_HOSTNAME}_fullchain.cer \
+  /opt/keycloak/conf/server.crt.pem
+install -m 600 -o 1000 -g 0 \
+  /mnt/state/$KEYCLOAK_HOSTNAME.key \
+  /opt/keycloak/conf/server.key.pem
+
+# wait for database to be ready
+
+wait_state DATABASE_READY /mnt/state/state.db \
+  "pg_isready -h localhost -d keycloak -U keycloak -q"
+
+# prepare Keycloak configuration file
+
+test -f /opt/keycloak/conf/keycloak.conf
+
+sed -i \
+  -e 's/^#\(db-password\)=.*$/\1='$POSTGRES_KEYCLOAK_PASSWORD'/' \
+  -e 's/^#\(db-username\)=.*$/\1=keycloak/' \
+  -e 's|^#\(db-url\)=.*$|\1=jdbc:postgres://localhost/keycloak|' \
+  -e 's/^#\(hostname\)=.*$/\1='$KEYCLOAK_HOSTNAME'/' \
+  -e 's|^#\(https-certificate-file\)=.*$|\1=/opt/keycloak/conf/server.crt.pem|' \
+  -e 's|^#\(https-certificate-key-file\)=.*$|\1=/opt/keycloak/conf/server.key.pem|' \
+  -e '$a\\' \
+  -e '$ahttps-port=8444' \
+  -e '$alog-level='$KEYCLOAK_LOG_LEVEL \
+  /opt/keycloak/conf/keycloak.conf
+
+# start Keycloak (as in original entrypoint)
+
+PATH=$PATH:/opt/keycloak/bin
+
+KEYCLOAK_ADMIN=admin kc.sh $@ &
+
+while true; do
+  echo "$(date +%H:%M:%S) waiting for Keycloak to start"
+
+  if curl --head -fsS https://$KEYCLOAK_HOSTNAME:8444/health/ready \
+    > /dev/null 2>&1; then
+    break
+  fi
+
+  sleep 1
+done
+
+# create session
+
+kc_login
+config=/var/run/keycloak/kcadm.config
+
+# define helper functions
+
+createExecution() {
+  test $# -eq 4
+  id=$(kcadm.sh create --config $config -r $1 -i \
+    authentication/flows/$2/executions/execution \
+    -s provider=$3)
+  kcadm.sh get --config $config -r $1 \
+    authentication/flows/$2/executions | \
+    jq --arg id $id --arg requirement $4 \
+      '.[] | select(.id == $id) | {"id":.id,"requirement":$requirement}' | \
+    kcadm.sh update --config $config -r $1 \
+      authentication/flows/$2/executions \
+      -f -
+}
+
+createFlow() {
+  test $# -eq 2
+  kcadm.sh create --config $config -r $1 \
+    authentication/flows \
+    -s alias=$2 \
+    -s builtIn=false \
+    -s providerId=basic-flow \
+    -s topLevel=true
+}
+
+createSubflow() {
+  test $# -eq 4
+  flowId=$(kcadm.sh create --config $config -r $1 -i \
+    authentication/flows/$2/executions/flow \
+    -s alias=$3 \
+    -s type=basic-flow)
+  kcadm.sh get --config $config -r $1 \
+    authentication/flows/$2/executions | \
+    jq --arg flowId $flowId --arg requirement $4 \
+    '.[] | select(.flowId == $flowId) |
+      {"id":.id,"requirement":$requirement}' | \
+      kcadm.sh update --config $config -r $1 \
+        authentication/flows/$2/executions \
+        -f -
+}
+
+# create realms, etc., if necessary
+
+for demo in 1 2; do
+  realm=oidc-passkey-demo-$demo
+
+  if kcadm.sh get realms/$realm --config $config &> /dev/null; then
+    echo "realm $realm already exists"
+    break
+  fi
+
+  echo "creating realm $realm"
+  kcadm.sh create realms --config $config \
+    -s realm=$realm \
+    -s enabled=true
+
+  case $demo in
+  1)
+    required_action=webauthn-register-passwordless
+    ;;
+  2)
+    required_action=webauthn-register
+    ;;
+  *)
+    exit 1
+  esac
+
+  echo "enabling required action by default: $required_action"
+  kcadm.sh update --config $config -r $realm \
+    authentication/required-actions/$required_action \
+    -s defaultAction=true
+
+  client_id=demo-$demo-client
+  flow=demo-$demo-webauthn
+  subflow_1=demo-$demo-webauthn-subflow-1
+
+  echo "creating flow $flow"
+  createFlow $realm $flow
+
+  case $demo in
+  1)
+    subflow_2=demo-$demo-webauthn-subflow-2
+    subflow_3=demo-$demo-webauthn-subflow-3
+    subflow_4=demo-$demo-webauthn-subflow-4
+
+    echo "creating execution auth-cookie in $flow"
+    createExecution $realm $flow auth-cookie ALTERNATIVE
+    echo "creating subflow $subflow_1 in $flow"
+    createSubflow $realm $flow $subflow_1 ALTERNATIVE
+    echo "creating execution auth-username-form in $subflow_1"
+    createExecution $realm $subflow_1 auth-username-form REQUIRED
+    echo "creating subflow $subflow_2 in $subflow_1"
+    createSubflow $realm $subflow_1 $subflow_2 REQUIRED
+    echo "creating execution webauthn-authenticator-passwordless in " $subflow_2
+    createExecution $realm $subflow_2 webauthn-authenticator-passwordless \
+      ALTERNATIVE
+    echo "creating subflow $subflow_3 in $subflow_2"
+    createSubflow $realm $subflow_2 $subflow_3 ALTERNATIVE
+    echo "creating execution auth-password-form in $subflow_3"
+    createExecution $realm $subflow_3 auth-password-form REQUIRED
+    echo "creating subflow $subflow_4 in $subflow_3"
+    createSubflow $realm $subflow_3 $subflow_4 CONDITIONAL
+    echo "creating execution conditional-user-configured in $subflow_4"
+    createExecution $realm $subflow_4 conditional-user-configured REQUIRED
+    echo "creating execution webauthn-authenticator in $subflow_4"
+    createExecution $realm $subflow_4 webauthn-authenticator ALTERNATIVE
+    ;;
+  2)
+    echo "creating execution auth-cookie in $flow"
+    createExecution $realm $flow auth-cookie ALTERNATIVE
+    echo "creating subflow $subflow_1 in $flow"
+    createSubflow $realm $flow $subflow_1 ALTERNATIVE
+    echo "creating execution auth-username-password-form in $subflow_1"
+    createExecution $realm $subflow_1 auth-username-password-form REQUIRED
+    echo "creating execution webauthn-authenticator in $subflow_1"
+    createExecution $realm $subflow_1 webauthn-authenticator REQUIRED
+    ;;
+  *)
+    exit 1
+  esac
+
+  echo "creating client $client_id"
+  kcadm.sh create clients --config $config -r $realm \
+    -s clientId=$client_id \
+    -s directAccessGrantsEnabled=false \
+    -s protocol=openid-connect \
+    -s publicClient=false \
+    -s 'redirectUris=["https://'$APACHE_HOSTNAME:$((443 + $demo))'/vanity.html"]' \
+    -s 'attributes={"post.logout.redirect.uris":"'https://$APACHE_HOSTNAME'"}' \
+    -s standardFlowEnabled=true \
+    -s enabled=true
+
+  echo "binding flow $flow to client $client_id's browser flow'"
+  flow_id=$(kcadm.sh get --config $config -r $realm \
+    authentication/flows | \
+    jq -r --arg flow $flow \
+      '.[] | select(.alias == $flow) | .id')
+  test -n "$flow_id"
+  id=$(kcadm.sh get --config $config -r $realm \
+    clients | \
+    jq -r --arg clientId $client_id \
+      '.[] | select(.clientId == $clientId) | .id')
+  test -n "$id"
+  jq --arg flow_id $flow_id -n \
+    '{"authenticationFlowBindingOverrides":{"browser":$flow_id}}' | \
+    kcadm.sh update --config $config -r $realm \
+      clients/$id -f -
+
+  echo "creating LDAP user storage provider"
+  kcadm.sh create components --config $config -r $realm \
+    -s providerType=org.keycloak.storage.UserStorageProvider \
+    -s providerId=ldap \
+    -s name="LDAP Test Server" \
+    -s 'config.vendor=["other"]' \
+    -s 'config.connectionUrl=["ldap://ldap.forumsys.com:389"]' \
+    -s 'config.startTls=["false"]' \
+    -s 'config.authType=["simple"]' \
+    -s 'config.bindDn=["cn=read-only-admin,dc=example,dc=com"]' \
+    -s 'config.bindCredential=["password"]' \
+    -s 'config.editMode=["READ_ONLY"]' \
+    -s 'config.usersDn=["dc=example,dc=com"]' \
+    -s 'config.usernameLDAPAttribute=["uid"]' \
+    -s 'config.rdnLDAPAttribute=["uid"]' \
+    -s 'config.uuidLDAPAttribute=["entryUUID"]' \
+    -s 'config.userObjectClasses=["inetOrgPerson"]' \
+    -s 'config.syncRegistrations=["false"]' \
+    -s 'config.trustEmail=["true"]' \
+    -s 'config.enabled=["true"]'
+
+  # store client secrets
+
+  echo "storing client secret for client $client_id"
+  client_secret=$(kcadm.sh get --config $config -r $realm \
+    clients | \
+    jq -r --arg clientId $client_id \
+      '.[] | select(.clientId == $clientId) | .secret')
+  test -n "$client_secret"
+  echo $client_secret > /mnt/state/demo-$demo-client-secret
+done
+
+# clean-up
+
+kc_logout
+
+# update state
+
+set_state KEYCLOAK_READY /mnt/state/state.keycloak
+
+# resume Keycloak in the foreground (as in original entrypoint)
+
+wait

@@ -1,0 +1,31 @@
+
+set_state() {
+  test $# -eq 2
+  state=$1
+  file=$2
+
+  echo "setting $(basename $file) := $state"
+  tmp=$(mktemp)
+  install -m 644 <(echo $state) $tmp 
+  mv $tmp $file # atomic
+}
+
+wait_state() {
+  test $# -eq 2 -o $# -eq 3
+  state=$1
+  file=$2
+  command=$3
+
+  while true; do
+    echo "$(date +%H:%M:%S) waiting for $(basename $file) == $state"
+
+    if [ -f $file ] && [ "$(cat $file)" = $state ]; then
+      break
+    fi
+    if [ -n "$command" ] && $command; then
+      break
+    fi
+
+    sleep 1
+  done
+}

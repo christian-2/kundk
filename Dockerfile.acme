@@ -1,0 +1,9 @@
+FROM neilpang/acme.sh
+
+VOLUME /acme.sh
+VOLUME /mnt/state
+VOLUME /var/run/docker.sock
+
+COPY files/state /usr/local/bin/
+COPY files/acme/entrypoint /
+ENTRYPOINT ["/entrypoint"]

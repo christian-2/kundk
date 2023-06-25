@@ -1,0 +1,55 @@
+ARG KEYCLOAK_VERSION=21.1.1
+ARG KEYCLOAK_RELEASEVER=9
+FROM registry.access.redhat.com/ubi${KEYCLOAK_RELEASEVER}/ubi AS package-builder
+
+RUN mkdir -p /mnt/rootfs
+ARG KEYCLOAK_RELEASEVER
+RUN yum install \
+    --installroot /mnt/rootfs \
+    --releasever ${KEYCLOAK_RELEASEVER} \
+    --setopt install_weak_deps=false \
+    --nodocs -y \
+    curl gzip httpd jq nc openssl postgresql python3 python3-pip socat tar && \
+  yum clean all
+RUN rm -rf /mnt/rootfs/var/cache/*
+
+FROM quay.io/keycloak/keycloak:${KEYCLOAK_VERSION} AS keycloak-builder
+
+WORKDIR /opt/keycloak
+RUN /opt/keycloak/bin/kc.sh build \
+  --db=postgres \
+  --health-enabled=true
+
+FROM quay.io/keycloak/keycloak:${KEYCLOAK_VERSION}
+
+RUN test $(id -u) -eq 1000 -a $(id -g) -eq 0
+USER 0
+COPY --from=package-builder /mnt/rootfs/ /
+RUN install -o 1000 -g 0 -d /var/run/keycloak
+RUN install -o 1000 -g 0 -d /var/lib/keycloak
+USER 1000
+
+COPY --from=keycloak-builder /opt/keycloak/ /opt/keycloak/
+
+RUN \
+  python3 -m venv /var/lib/keycloak/venv && \
+  mkdir -p /var/lib/keycloak/cache/pip && \
+  /var/lib/keycloak/venv/bin/pip3 install \
+    --cache-dir /var/lib/keycloak/cache/pip --upgrade pip PyJWT
+
+ENV APACHE_HOSTNAME ""
+ENV KEYCLOAK_ADMIN_PASSWORD ""
+ENV KEYCLOAK_HOSTNAME ""
+ENV KEYCLOAK_LOG_LEVEL WARN
+ENV POSTGRES_KEYCLOAK_PASSWORD ""
+
+COPY files/state /usr/local/bin/
+COPY files/keycloak/kc_* files/keycloak/*.py /usr/local/bin/
+
+VOLUME /mnt/state
+
+COPY --chown=jboss:jboss --chmod=755 \
+  files/keycloak/entrypoint /opt/keycloak/bin/
+ENTRYPOINT ["/opt/keycloak/bin/entrypoint"]
+RUN test -f /opt/keycloak/conf/keycloak.conf
+CMD ["start", "--optimized" ]

@@ -1,0 +1,13 @@
+#!/bin/bash
+set -e
+trap 'echo "error: $0:$LINENO"' ERR
+
+cd $(dirname $0)/..
+
+docker volume rm state || true
+docker volume create state
+dir=$(docker volume inspect state | jq -r '.[0].Mountpoint')
+test $EUID -eq 0
+sudo chmod 777 $dir
+
+docker compose up -d

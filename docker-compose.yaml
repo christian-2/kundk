@@ -1,0 +1,103 @@
+version: "3.2"
+services:
+  acme:
+    image: oidc-passkey/acme
+    build:
+      context: .
+      dockerfile: Dockerfile.acme
+      network: host
+    environment:
+    - ACME_EMAIL
+    - APACHE_HOSTNAME
+    - KEYCLOAK_HOSTNAME
+    volumes:
+    - acme:/acme.sh
+    - state:/mnt/state
+    - /var/run/docker.sock:/var/run/docker.sock
+    network_mode: host
+    command: "daemon"
+  db:
+    image: oidc-passkey/db
+    build:
+      context: .
+      dockerfile: Dockerfile.db
+    environment:
+    - POSTGRES_KEYCLOAK_PASSWORD
+    - POSTGRES_PASSWORD
+    volumes:
+    - state:/mnt/state
+    - data:/var/lib/postgresql/data
+    network_mode: host
+  demo:
+    image: oidc-passkey/demo
+    init: true
+    build:
+      context: .
+      dockerfile: Dockerfile.demo
+      network: host
+    environment:
+    - APACHE_HOSTNAME
+    - APACHE_LOG_LEVEL
+    volumes:
+    - state:/mnt/state
+    network_mode: host
+  demo-1:
+    image: oidc-passkey/demo-1
+    init: true
+    build:
+      context: .
+      dockerfile: Dockerfile.demo
+      network: host
+    environment:
+    - APACHE_HOSTNAME
+    - APACHE_LOG_LEVEL
+    - APACHE_PORT=444
+    - KEYCLOAK_HOSTNAME
+    - KEYCLOAK_OIDC_REMOTE_USER_CLAIM
+    - KEYCLOAK_OIDC_SCOPE
+    - OIDC_PASSKEY_DEMO=1
+    volumes:
+    - state:/mnt/state
+    network_mode: host
+  demo-2:
+    image: oidc-passkey/demo-2
+    init: true
+    build:
+      context: .
+      dockerfile: Dockerfile.demo
+      network: host
+    environment:
+    - APACHE_HOSTNAME
+    - APACHE_LOG_LEVEL
+    - APACHE_PORT=445
+    - KEYCLOAK_HOSTNAME
+    - KEYCLOAK_OIDC_REMOTE_USER_CLAIM
+    - KEYCLOAK_OIDC_SCOPE
+    - OIDC_PASSKEY_DEMO=2
+    volumes:
+    - state:/mnt/state
+    network_mode: host
+  keycloak:
+    image: oidc-passkey/keycloak
+    init: true
+    build:
+      context: .
+      dockerfile: Dockerfile.keycloak
+      network: host
+    environment:
+    - APACHE_HOSTNAME
+    - KEYCLOAK_ADMIN_PASSWORD
+    - KEYCLOAK_HOSTNAME
+    - KEYCLOAK_LOG_LEVEL
+    - POSTGRES_KEYCLOAK_PASSWORD
+    volumes:
+    - state:/mnt/state
+    - ./blob.jwt:/mnt/blob.jwt:ro
+    network_mode: host
+volumes:
+  acme:
+    external: true
+  data:
+    external: true
+  state:
+    external: true

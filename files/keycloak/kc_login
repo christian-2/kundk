@@ -1,0 +1,11 @@
+#!/bin/bash
+set -e
+trap 'echo "error: $0:$LINENO"' ERR
+
+config=/var/run/keycloak/kcadm.config
+/opt/keycloak/bin/kcadm.sh config credentials \
+  --config $config \
+  --server https://$KEYCLOAK_HOSTNAME:8444 \
+  --realm master \
+  --user admin \
+  --password $KEYCLOAK_ADMIN_PASSWORD

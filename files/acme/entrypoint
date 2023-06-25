@@ -1,0 +1,65 @@
+#!/usr/bin/env sh
+set -e
+
+echo "ACME_EMAIL=$ACME_EMAIL"
+echo "APACHE_HOSTNAME=$APACHE_HOSTNAME"
+echo "KEYCLOAK_HOSTNAME=$KEYCLOAK_HOSTNAME"
+
+test -n "$ACME_EMAIL"
+test -n "$APACHE_HOSTNAME"
+test -n "$KEYCLOAK_HOSTNAME"
+
+# update account with email address
+
+acme.sh --register-account -m $ACME_EMAIL
+
+# update state
+
+. /usr/local/bin/state
+
+set_state STARTED /mnt/state/state.acme
+
+# issue or renew certificates
+
+# check if acme.sh uses ECC certificates
+grep ^DEFAULT_DOMAIN_KEY_LENGTH=ec /usr/local/bin/acme.sh
+
+if [ ! -f /acme.sh/${APACHE_HOSTNAME}_ecc/$APACHE_HOSTNAME.cer ]; then
+  acme.sh --issue -d $APACHE_HOSTNAME --standalone --httpport 8445
+else
+  acme.sh --renew -d $APACHE_HOSTNAME --standalone --httpport 8445 || true
+fi
+
+if [ $APACHE_HOSTNAME != $KEYCLOAK_HOSTNAME ]; then
+  if [ ! -f /acme.sh/${KEYCLOAK_HOSTNAME}_ecc/$KEYCLOAK_HOSTNAME.cer ]; then
+    acme.sh --issue -d $KEYCLOAK_HOSTNAME --standalone --httpport 8445
+  else
+    acme.sh --renew -d $KEYCLOAK_HOSTNAME --standalone --httpport 8445 || true
+  fi
+fi
+
+# copy certificates, keys into shared volume
+
+install -m 644 /acme.sh/${APACHE_HOSTNAME}_ecc/$APACHE_HOSTNAME.cer \
+  /mnt/state/$APACHE_HOSTNAME.cer
+install -m 644 /acme.sh/${APACHE_HOSTNAME}_ecc/$APACHE_HOSTNAME.key \
+  /mnt/state/$APACHE_HOSTNAME.key
+install -m 644 /acme.sh/${APACHE_HOSTNAME}_ecc/fullchain.cer \
+  /mnt/state/${APACHE_HOSTNAME}_fullchain.cer
+
+if [ $APACHE_HOSTNAME != $KEYCLOAK_HOSTNAME ]; then
+  install -m 644 /acme.sh/${KEYCLOAK_HOSTNAME}_ecc/$KEYCLOAK_HOSTNAME.cer \
+    /mnt/state/$KEYCLOAK_HOSTNAME.crt
+  install -m 644 /acme.sh/${KEYCLOAK_HOSTNAME}_ecc/$KEYCLOAK_HOSTNAME.key \
+    /mnt/state/$KEYCLOAK_HOSTNAME.key
+  install -m 644 /acme.sh/${KEYCLOAK_HOSTNAME}_ecc/fullchain.cer \
+    /mnt/state/${KEYCLOAK_HOSTNAME}_fullchain.cer
+fi
+
+# update state
+
+set_state CERTIFICATES_READY /mnt/state/state.acme
+
+# exec base image's entrypoint
+
+exec /entry.sh "$@"
