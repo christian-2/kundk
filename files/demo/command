@@ -6,7 +6,6 @@ trap 'echo "error: $0:$LINENO"' ERR
 
 echo "APACHE_HOSTNAME=$APACHE_HOSTNAME"
 echo "APACHE_LOG_LEVEL=$APACHE_LOG_LEVEL"
-echo "APACHE_PORT=$APACHE_PORT"
 echo "KEYCLOAK_HOSTNAME=$KEYCLOAK_HOSTNAME"
 echo "KEYCLOAK_OIDC_REMOTE_USER_CLAIM=$KEYCLOAK_OIDC_REMOTE_USER_CLAIM"
 echo "KEYCLOAK_OIDC_SCOPE=$KEYCLOAK_OIDC_SCOPE"
@@ -15,7 +14,6 @@ echo "OIDC_PASSKEY_DEMO=$OIDC_PASSKEY_DEMO"
 re='^[0-9]+$'
 test -n "$APACHE_HOSTNAME"
 test -n "$APACHE_LOG_LEVEL"
-[[ "$APACHE_PORT" =~ $re ]]
 test -n "$KEYCLOAK_HOSTNAME" -o -z "$OIDC_PASSKEY_DEMO"
 test -n "$KEYCLOAK_OIDC_REMOTE_USER_CLAIM" -o -z "$OIDC_PASSKEY_DEMO"
 test -n "$KEYCLOAK_OIDC_SCOPE" -o -z "$OIDC_PASSKEY_DEMO"
@@ -48,10 +46,6 @@ sed -i \
   -e 's/^#\(LoadModule .*mod_socache_shmcb.so\)/\1/' \
   /usr/local/apache2/conf/httpd.conf
 
-# adjust port
-
-sed -i 's/443/'$APACHE_PORT'/g' /usr/local/apache2/conf/extra/httpd-ssl.conf
-
 if [ -z "$OIDC_PASSKEY_DEMO" ]; then
 
   # wait for individual demos to have started
@@ -80,11 +74,16 @@ if [ -z "$OIDC_PASSKEY_DEMO" ]; then
 EOF
 
 else
-  realm=oidc-passkey-demo-$OIDC_PASSKEY_DEMO
 
   # wait for Keycloak to be ready
 
   wait_state KEYCLOAK_READY /mnt/state/state.keycloak
+
+  # adjust port
+
+  apache_port=$((9443 + $OIDC_PASSKEY_DEMO))
+  sed -i 's/443/'$apache_port'/g' \
+    /usr/local/apache2/conf/extra/httpd-ssl.conf
 
   # enable CGI
 
@@ -123,8 +122,9 @@ DirectoryIndex index.cgi \
 </Directory>' \
     /usr/local/apache2/conf/httpd.conf
 
+  realm=oidc-passkey-demo-$OIDC_PASSKEY_DEMO
   discovery_url=https://$KEYCLOAK_HOSTNAME:8444/realms/$realm/.well-known/openid-configuration
-  redirect_uri=https://$APACHE_HOSTNAME:$((9443 + $OIDC_PASSKEY_DEMO))/vanity.html
+  redirect_uri=https://$APACHE_HOSTNAME:$apache_port/vanity.html
 
   cat >> /usr/local/apache2/conf/httpd.conf << EOF
 
