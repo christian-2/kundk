@@ -115,14 +115,27 @@ createSubflow() {
         -f -
 }
 
+store_client_secrets() {
+  test $# -eq 3
+  echo "storing client secret for client $3"
+  client_secret=$(kcadm.sh get --config $config -r $2 \
+    clients | \
+    jq -r --arg clientId $3 \
+      '.[] | select(.clientId == $clientId) | .secret')
+  test -n "$client_secret"
+  echo $client_secret > /mnt/state/demo-$1-client-secret
+}
+
 # create realms, etc., if necessary
 
 for demo in 1 2; do
   realm=oidc-passkey-demo-$demo
+  client_id=demo-$demo-client
 
   if kcadm.sh get realms/$realm --config $config &> /dev/null; then
     echo "realm $realm already exists"
-    break
+    store_client_secrets $demo $realm $client_id
+    continue
   fi
 
   echo "creating realm $realm"
@@ -146,7 +159,6 @@ for demo in 1 2; do
     authentication/required-actions/$required_action \
     -s defaultAction=true
 
-  client_id=demo-$demo-client
   flow=demo-$demo-webauthn
   subflow_1=demo-$demo-webauthn-subflow-1
 
@@ -243,15 +255,7 @@ for demo in 1 2; do
     -s 'config.trustEmail=["true"]' \
     -s 'config.enabled=["true"]'
 
-  # store client secrets
-
-  echo "storing client secret for client $client_id"
-  client_secret=$(kcadm.sh get --config $config -r $realm \
-    clients | \
-    jq -r --arg clientId $client_id \
-      '.[] | select(.clientId == $clientId) | .secret')
-  test -n "$client_secret"
-  echo $client_secret > /mnt/state/demo-$demo-client-secret
+  store_client_secrets $demo $realm $client_id
 done
 
 # clean-up
