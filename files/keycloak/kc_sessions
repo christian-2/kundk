@@ -100,7 +100,7 @@ for demo in 1 2; do
     if [ "$(jq '. | length' $sessions)" -eq 0 ]; then
       print_session \
         $realm $user_id $username \
-        $credential_id $type "$user_label" $aaguid $transports $created_date
+        $credential_id $type "$user_label" $aaguid "$transports" $created_date
     else
       for session_id in $(cat $sessions | jq -r '.[] | .id'); do
         ip_address=$(jq -r --arg id $session_id \
@@ -111,7 +111,7 @@ for demo in 1 2; do
           '.[] | select(.id == $id) | .clients | .[]' $sessions | paste -sd,)
         print_session \
          $realm $user_id $username \
-         $credential_id $type "$user_label" $aaguid $transports $created_date \
+         $credential_id $type "$user_label" $aaguid "$transports" $created_date \
          $ip_address $start $client_ids
       done
     fi
