@@ -14,7 +14,7 @@ echo "OIDC_PASSKEY_DEMO=$OIDC_PASSKEY_DEMO"
 re='^[0-9]+$'
 test -n "$APACHE_HOSTNAME"
 test -n "$APACHE_LOG_LEVEL"
-test -n "$KEYCLOAK_HOSTNAME" -o -z "$OIDC_PASSKEY_DEMO"
+test -n "$KEYCLOAK_HOSTNAME"
 test -n "$KEYCLOAK_OIDC_REMOTE_USER_CLAIM" -o -z "$OIDC_PASSKEY_DEMO"
 test -n "$KEYCLOAK_OIDC_SCOPE" -o -z "$OIDC_PASSKEY_DEMO"
 [ -z "$OIDC_PASSKEY_DEMO" ] || [[ "$OIDC_PASSKEY_DEMO" =~ $re ]]
@@ -61,18 +61,32 @@ if [ -z "$OIDC_PASSKEY_DEMO" ]; then
     /usr/local/apache2/htdocs/index.html << EOF
 <html><body>
 <h1>oidc-passkey</h1>
+EOF
+  for demo in 1 2; do
+    case $demo in
+    1)
+      description="authentication: FIDO passkey (1FA); registration: LDAP; protocol: OIDC"
+      ;;
+    2)
+      description="authentication: LDAP + FIDO passkey (2FA); registration: LDAP; protocol: OIDC"
+      ;;
+    *)
+      exit 1
+    esac
+    realm=oidc-passkey-demo-$demo
+    cat >> /usr/local/apache2/htdocs/index.html << EOF
+<li>
+<a href="https://$APACHE_HOSTNAME:$((9443 + $demo))">demo #$demo</a>:
+$description
 <ul>
 <li>
-  <a href="https://$APACHE_HOSTNAME:$((9443 + 1))">demo #1</a>:
-  authentication: FIDO passkey (1FA); registration: LDAP
-</li>
-<li>
-  <a href="https://$APACHE_HOSTNAME:$((9443 + 2))">demo #2</a>:
-  authentication: LDAP + FIDO passkey (2FA); registration: LDAP
+<a href="https://$KEYCLOAK_HOSTNAME:8444/realms/$realm/account">account console</a>: e.g. remove registrations, add authenticators
 </li>
 </ul>
+</li>
 EOF
-
+  done
+  echo "</ul>" >> /usr/local/apache2/htdocs/index.html
 else
 
   # wait for Keycloak to be ready

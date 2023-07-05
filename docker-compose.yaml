@@ -38,6 +38,7 @@ services:
     environment:
     - APACHE_HOSTNAME
     - APACHE_LOG_LEVEL
+    - KEYCLOAK_HOSTNAME
     volumes:
     - state:/mnt/state
     network_mode: host
