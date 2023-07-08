@@ -36,6 +36,7 @@ services:
       dockerfile: Dockerfile.demo
       network: host
     environment:
+    - APACHE_EMAIL
     - APACHE_HOSTNAME
     - APACHE_LOG_LEVEL
     - KEYCLOAK_HOSTNAME
@@ -50,6 +51,7 @@ services:
       dockerfile: Dockerfile.demo
       network: host
     environment:
+    - APACHE_EMAIL
     - APACHE_HOSTNAME
     - APACHE_LOG_LEVEL
     - KEYCLOAK_HOSTNAME
@@ -67,12 +69,45 @@ services:
       dockerfile: Dockerfile.demo
       network: host
     environment:
+    - APACHE_EMAIL
     - APACHE_HOSTNAME
     - APACHE_LOG_LEVEL
     - KEYCLOAK_HOSTNAME
     - KEYCLOAK_OIDC_REMOTE_USER_CLAIM
     - KEYCLOAK_OIDC_SCOPE
     - OIDC_PASSKEY_DEMO=2
+    volumes:
+    - state:/mnt/state
+    network_mode: host
+  demo-3:
+    image: oidc-passkey/demo-3
+    init: true
+    build:
+      context: .
+      dockerfile: Dockerfile.demo
+      network: host
+    environment:
+    - APACHE_EMAIL
+    - APACHE_HOSTNAME
+    - APACHE_LOG_LEVEL
+    - KEYCLOAK_HOSTNAME
+    - OIDC_PASSKEY_DEMO=3
+    volumes:
+    - state:/mnt/state
+    network_mode: host
+  demo-4:
+    image: oidc-passkey/demo-4
+    init: true
+    build:
+      context: .
+      dockerfile: Dockerfile.demo
+      network: host
+    environment:
+    - APACHE_EMAIL
+    - APACHE_HOSTNAME
+    - APACHE_LOG_LEVEL
+    - KEYCLOAK_HOSTNAME
+    - OIDC_PASSKEY_DEMO=4
     volumes:
     - state:/mnt/state
     network_mode: host

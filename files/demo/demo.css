@@ -1,0 +1,15 @@
+body, th, td {
+  font-family: helvetica, arial, sans-serif;
+  font-size: 0.875rem;
+}
+
+table {
+ border-collapse: collapse;
+ margin: 20px;
+}
+table, th, td {
+  border: 0.1px solid;
+}
+th, td {
+  padding: 5px;
+}

@@ -4,6 +4,7 @@ trap 'echo "error: $0:$LINENO"' ERR
 
 # check ENVs
 
+echo "APACHE_EMAIL=$APACHE_EMAIL"
 echo "APACHE_HOSTNAME=$APACHE_HOSTNAME"
 echo "APACHE_LOG_LEVEL=$APACHE_LOG_LEVEL"
 echo "KEYCLOAK_HOSTNAME=$KEYCLOAK_HOSTNAME"
@@ -11,13 +12,13 @@ echo "KEYCLOAK_OIDC_REMOTE_USER_CLAIM=$KEYCLOAK_OIDC_REMOTE_USER_CLAIM"
 echo "KEYCLOAK_OIDC_SCOPE=$KEYCLOAK_OIDC_SCOPE"
 echo "OIDC_PASSKEY_DEMO=$OIDC_PASSKEY_DEMO"
 
-re='^[0-9]+$'
+test -n "$APACHE_EMAIL"
 test -n "$APACHE_HOSTNAME"
 test -n "$APACHE_LOG_LEVEL"
-test -n "$KEYCLOAK_HOSTNAME"
-test -n "$KEYCLOAK_OIDC_REMOTE_USER_CLAIM" -o -z "$OIDC_PASSKEY_DEMO"
-test -n "$KEYCLOAK_OIDC_SCOPE" -o -z "$OIDC_PASSKEY_DEMO"
-[ -z "$OIDC_PASSKEY_DEMO" ] || [[ "$OIDC_PASSKEY_DEMO" =~ $re ]]
+[[ -n "$KEYCLOAK_HOSTNAME" ]]
+[[ -n "$KEYCLOAK_OIDC_REMOTE_USER_CLAIM" || "$OIDC_PASSKEY_DEMO" =~ ^(3|4)?$ ]]
+[[ -n "$KEYCLOAK_OIDC_SCOPE" || "$OIDC_PASSKEY_DEMO" =~ ^(3|4)?$ ]]
+[[ -z "$OIDC_PASSKEY_DEMO" || "$OIDC_PASSKEY_DEMO" =~  ^[0-9]+$ ]]
 
 # wait for ACME certificate to have arrived
 
@@ -59,6 +60,7 @@ if [ -z "$OIDC_PASSKEY_DEMO" ]; then
 
   install -o www-data -g www-data -m 744 /dev/stdin \
     /usr/local/apache2/htdocs/index.html << EOF
+<<<<<<< HEAD
 <html><body>
 <h1>oidc-passkey</h1>
 EOF
@@ -69,10 +71,60 @@ EOF
       ;;
     2)
       description="authentication: LDAP + FIDO passkey (2FA); registration: LDAP; protocol: OIDC"
+=======
+<html>
+<head>
+<link rel="stylesheet" href="demo.css">
+</head>
+<body>
+EOF
+  for demo in 1 2 3 4; do
+
+    if [[ $demo == 1 || $demo == 3 ]]; then
+      cat >> /usr/local/apache2/htdocs/index.html << EOF
+<table>
+<tr>
+<th>demo</th>
+<th>account</th>
+<th>realm admin</th>
+<th>authentication</th>
+<th>registration</th>
+<th>IdP</th>
+<th>SP</th>
+</tr>
+EOF
+    fi
+
+    case $demo in
+    1)
+      authentication="FIDO passkey (1FA)"
+      registration=LDAP
+      idp="Keycloak (OIDC)"
+      sp="Apache (mod_auth_openidc)"
+      ;;
+    2)
+      authentication="LDAP + FIDO passkey (2FA)"
+      registration=LDAP
+      idp="Keycloak (OIDC)"
+      sp="Apache (mod_auth_openidc)"
+      ;;
+    3)
+      authentication="FIDO passkey (1FA)"
+      registration=LDAP
+      idp="Keycloak (SAML 2.0)"
+      sp="Apache (mod_shib)"
+      ;;
+    4)
+      authentication="LDAP + FIDO passkey (2FA)"
+      registration=LDAP
+      idp="Keycloak (SAML 2.0)"
+      sp="Apache (mod_shib)"
+>>>>>>> feat/shib2
       ;;
     *)
       exit 1
     esac
+<<<<<<< HEAD
     realm=oidc-passkey-demo-$demo
     cat >> /usr/local/apache2/htdocs/index.html << EOF
 <li>
@@ -84,6 +136,35 @@ $description
 </li>
 </ul>
 </li>
+=======
+
+    realm=oidc-passkey-demo-$demo
+    demo_url=https://$APACHE_HOSTNAME:$((9443 + $demo))
+    account_console_url=https://$KEYCLOAK_HOSTNAME:8444/realms/$realm/account
+    realm_admin_console_url=https://$KEYCLOAK_HOSTNAME:8444/admin/$realm/console
+
+    cat >> /usr/local/apache2/htdocs/index.html << EOF
+<tr>
+<td><a href="$demo_url">demo #$demo</a></td>
+<td><a href="$account_console_url">console #$demo</td>
+<td><a href="$realm_admin_console_url">console #$demo</td>
+<td>$authentication</td>
+<td>$registration</td>
+<td>$idp</td>
+<td>$sp</td>
+</tr>
+EOF
+
+    if [[ $demo == 2 || $demo == 4 ]]; then
+      cat >> /usr/local/apache2/htdocs/index.html << EOF
+</table>
+EOF
+    fi
+  done
+  cat >> /usr/local/apache2/htdocs/index.html << EOF
+</body>
+</html>
+>>>>>>> feat/shib2
 EOF
   done
   echo "</ul>" >> /usr/local/apache2/htdocs/index.html
@@ -96,7 +177,11 @@ else
   # adjust port
 
   apache_port=$((9443 + $OIDC_PASSKEY_DEMO))
-  sed -i 's/443/'$apache_port'/g' \
+  sed -i \
+    -e 's/^\(Listen\) 443/\1 '$apache_port'/' \
+    -e 's/^<\(VirtualHost\) _default_:443>$/<\1 _default_:'$apache_port'>/' \
+    -e 's/^\(ServerName\) .*$/\1 '$APACHE_HOSTNAME':'$apache_port'/' \
+    -e 's/^\(ServerAdmin\) .*$/\1 '$APACHE_EMAIL'/' \
     /usr/local/apache2/conf/extra/httpd-ssl.conf
 
   # enable CGI
@@ -106,10 +191,23 @@ else
     -e 's/#\(LoadModule .*mod_cgid.so\)/\1/' \
     /usr/local/apache2/conf/httpd.conf
 
-  # enforce OIDC
+  # enforce OIDC or SAML
+
+  case $OIDC_PASSKEY_DEMO in
+  1|2)
+    module=auth_openidc_module
+    filename=mod_auth_openidc.so
+    ;;
+  3|4)
+    module=mod_shib
+    filename=mod_shib.so
+    ;;
+  *)
+    exit 1
+  esac
 
   sed -i \
-    -e '$aLoadModule auth_openidc_module /usr/lib/apache2/modules/mod_auth_openidc.so' \
+    -e '$aLoadModule '$module' /usr/lib/apache2/modules/'$filename \
     /usr/local/apache2/conf/httpd.conf
 
   # configure logging
@@ -122,11 +220,12 @@ else
 
   rm /usr/local/apache2/htdocs/index.html
 
-  client_secret=$(cat /mnt/state/demo-$OIDC_PASSKEY_DEMO-client-secret)
-  test -n "$client_secret"
+  realm=oidc-passkey-demo-$OIDC_PASSKEY_DEMO
 
-  sed -i \
-    -e '\|^<Directory "/usr/local/apache2/htdocs">$|,\|^</Directory>$|c \
+  case $OIDC_PASSKEY_DEMO in
+  1|2)
+    sed -i \
+      -e '\|^<Directory "/usr/local/apache2/htdocs">$|,\|^</Directory>$|c \
 <Directory "/usr/local/apache2/htdocs"> \
 AuthType openid-connect \
 Require valid-user \
@@ -134,15 +233,17 @@ Options +ExecCGI \
 AddHandler cgi-script .cgi \
 DirectoryIndex index.cgi \
 </Directory>' \
-    /usr/local/apache2/conf/httpd.conf
+      /usr/local/apache2/conf/httpd.conf
 
-  realm=oidc-passkey-demo-$OIDC_PASSKEY_DEMO
-  discovery_url=https://$KEYCLOAK_HOSTNAME:8444/realms/$realm/.well-known/openid-configuration
-  redirect_uri=https://$APACHE_HOSTNAME:$apache_port/vanity.html
+    discovery_url=https://$KEYCLOAK_HOSTNAME:8444/realms/$realm/.well-known/openid-configuration
+    redirect_uri=https://$APACHE_HOSTNAME:$apache_port/vanity.html
 
-  cat >> /usr/local/apache2/conf/httpd.conf << EOF
+    client_secret=$(cat /mnt/state/demo-$OIDC_PASSKEY_DEMO-client-secret)
+    test -n "$client_secret"
 
-<IfModule auth_openidc_module>
+    cat >> /usr/local/apache2/conf/httpd.conf << EOF
+
+<IfModule $module>
 OIDCClientID demo-$OIDC_PASSKEY_DEMO-client
 OIDCClientSecret $client_secret
 OIDCCryptoPassphrase $(tr -dc A-Za-z0-9 </dev/urandom | head -c 32)
@@ -154,28 +255,201 @@ OIDCScope "$KEYCLOAK_OIDC_SCOPE"
 </IfModule>
 EOF
 
-  end_session_endpoint=$(curl $discovery_url | jq -r .end_session_endpoint)
-  test -n "$end_session_endpoint"
+    end_session_endpoint=$(curl $discovery_url | jq -r .end_session_endpoint)
+    test -n "$end_session_endpoint"
 
-  post_logout_redirect_uri=https://$APACHE_HOSTNAME
+    post_logout_redirect_uri=https://$APACHE_HOSTNAME
 
-  install -o www-data -g www-data -m 744 /dev/stdin \
-    /usr/local/apache2/htdocs/index.cgi << EOF
+    install -o www-data -g www-data -m 744 /dev/stdin \
+      /usr/local/apache2/htdocs/index.cgi << EOF
 #!/bin/bash
 echo 'Content-type: text/html'
 echo
-echo '<html><body>'
+echo '<html>'
+echo '<head>'
+echo '<link rel="stylesheet" href="demo.css">'
+echo '</head>'
+echo '<body>'
 echo '<h1>Demo #$OIDC_PASSKEY_DEMO</h1>'
-echo "<p>Hello \$REMOTE_USER, you are now registered and authenticated.</p>"
+echo "<p>Hello \$REMOTE_USER, you are now registered and authenticated via OIDC.</p>"
 echo '<a href="$redirect_uri?logout=$(printf "$post_logout_redirect_uri" | jq -sRr @uri)">Logout</a>'
 echo '</body></html>'
 EOF
 
-  # provide content for glue
+    # provide content for glue
 
-  install -o www-data -g www-data -m 744 /dev/stdin /usr/local/apache2/htdocs/vanity.html << EOF
+    install -o www-data -g www-data -m 744 /dev/stdin \
+      /usr/local/apache2/htdocs/vanity.html << EOF
 <html><body><h1>Internal Error</h1></body></html>
 EOF
+    ;;
+  3|4)
+    sed -i \
+      -e '\|^<Directory "/usr/local/apache2/htdocs">$|,\|^</Directory>$|c \
+<Directory "/usr/local/apache2/htdocs"> \
+AuthType shibboleth \
+ShibRequestSetting requireSession 1 \
+Require shib-session \
+Options +ExecCGI \
+AddHandler cgi-script .cgi \
+DirectoryIndex index.cgi \
+</Directory> \
+\
+<Location /Shibboleth.sso> \
+  SetHandler shib \
+</Location>' \
+      /usr/local/apache2/conf/httpd.conf
+
+    install -o www-data -g www-data -m 744 /dev/stdin \
+      /usr/local/apache2/htdocs/index.cgi << EOF
+#!/bin/bash
+echo 'Content-type: text/html'
+echo
+echo '<html>'
+echo '<head>'
+echo '<link rel="stylesheet" href="demo.css">'
+echo '</head>'
+echo '<body>'
+echo '<h1>Demo #$OIDC_PASSKEY_DEMO</h1>'
+echo "<p>Hello \$REMOTE_USER, you are now registered and authenticated via SAML.</p>"
+echo '<a href="/Shibboleth.sso/Logout">Logout</a>'
+echo '</body></html>'
+EOF
+
+    # wait for Keycloak to be ready
+
+    wait_state KEYCLOAK_READY /mnt/state/state.keycloak
+
+    idp_entity_id=$(cat /mnt/state/demo-$OIDC_PASSKEY_DEMO-idp-entity-id)
+    test -n "$idp_entity_id"
+    sp_entity_id=$(cat /mnt/state/demo-$OIDC_PASSKEY_DEMO-sp-entity-id)
+    test -n "$sp_entity_id"
+
+    # patch shibboleth2.xml and provide signing credentials
+
+    cp -p /etc/shibboleth/shibboleth2.xml{,.orig}
+
+    major_version=$(apt-cache show libapache2-mod-shib| grep ^Version | \
+      sed -E 's/^Version: //' | cut -d\. -f1)
+    test "$major_version" -eq 3
+
+    xmlstarlet ed -L -O -N ns=urn:mace:shibboleth:3.0:native:sp:config \
+      -u /ns:SPConfig/ns:ApplicationDefaults/@entityID -v $sp_entity_id \
+      -u //@REMOTE_USER -v givenName \
+      /etc/shibboleth/shibboleth2.xml
+
+    xmlstarlet ed -L -O -N ns=urn:mace:shibboleth:3.0:native:sp:config \
+      -u /ns:SPConfig/ns:ApplicationDefaults/ns:Sessions/ns:SSO/@entityID \
+      -v $idp_entity_id \
+      -d //@discoveryProtocol \
+      -d //@discoveryURL \
+      /etc/shibboleth/shibboleth2.xml
+
+    xmlstarlet ed -L -O -N ns=urn:mace:shibboleth:3.0:native:sp:config \
+      -d "/ns:SPConfig/ns:ApplicationDefaults/ns:Sessions/ns:Handler[@type='MetadataGenerator']" \
+      /etc/shibboleth/shibboleth2.xml
+    xmlstarlet ed -L -O -N ns=urn:mace:shibboleth:3.0:native:sp:config \
+      -d "/ns:SPConfig/ns:ApplicationDefaults/ns:Sessions/ns:Handler[@type='Status']" \
+      /etc/shibboleth/shibboleth2.xml
+    xmlstarlet ed -L -O -N ns=urn:mace:shibboleth:3.0:native:sp:config \
+      -d "/ns:SPConfig/ns:ApplicationDefaults/ns:Sessions/ns:Handler[@type='Session']" \
+      /etc/shibboleth/shibboleth2.xml
+    xmlstarlet ed -L -O -N ns=urn:mace:shibboleth:3.0:native:sp:config \
+      -d "/ns:SPConfig/ns:ApplicationDefaults/ns:Sessions/ns:Handler[@type='DiscoveryFeed']" \
+      /etc/shibboleth/shibboleth2.xml
+
+    xmlstarlet ed -L -O -N ns=urn:mace:shibboleth:3.0:native:sp:config \
+      -i "/ns:SPConfig" -t attr -n xmlns:md -v urn:oasis:names:tc:SAML:2.0:metadata \
+      /etc/shibboleth/shibboleth2.xml
+
+    xmlstarlet ed -L -O -N ns=urn:mace:shibboleth:3.0:native:sp:config \
+      -N md=urn:oasis:names:tc:SAML:2.0:metadata \
+      -s /ns:SPConfig/ns:ApplicationDefaults/ns:Sessions \
+      -t elem -n md:SingleLogoutService \
+      --var sub '$prev' \
+      -i '$sub' -t attr -n Location -v /SLO/Redirect \
+      -i '$sub' -t attr -n conf:template -v /etc/shibboleth/bindingTemplate.html \
+      -i '$sub' -t attr -n Binding -v urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect \
+      /etc/shibboleth/shibboleth2.xml
+
+    xmlstarlet ed -L -O -N ns=urn:mace:shibboleth:3.0:native:sp:config \
+      -u /ns:SPConfig/ns:ApplicationDefaults/ns:Errors/@supportContact \
+      -v $APACHE_EMAIL \
+      -d //@helpLocation \
+      -d //@styleSheet \
+      /etc/shibboleth/shibboleth2.xml
+
+    xmlstarlet ed -L -O -N ns=urn:mace:shibboleth:3.0:native:sp:config \
+      -s /ns:SPConfig/ns:ApplicationDefaults \
+      -t elem -n MetadataProvider \
+      -i //MetadataProvider -t attr -n type -v XML \
+      -i //MetadataProvider -t attr -n url -v https://$KEYCLOAK_HOSTNAME:8444/realms/$realm/protocol/saml/descriptor \
+      /etc/shibboleth/shibboleth2.xml
+
+    test $(xmlstarlet sel -N ns=urn:mace:shibboleth:3.0:native:sp:config -t \
+      -m "/ns:SPConfig/ns:ApplicationDefaults/ns:CredentialResolver[@type='File' and @use='signing']" -v '@certificate' \
+      /etc/shibboleth/shibboleth2.xml) = sp-signing-cert.pem
+    test $(xmlstarlet sel -N ns=urn:mace:shibboleth:3.0:native:sp:config -t \
+      -m "/ns:SPConfig/ns:ApplicationDefaults/ns:CredentialResolver[@type='File' and @use='signing']" -v '@key' \
+      /etc/shibboleth/shibboleth2.xml) = sp-signing-key.pem
+    install -o root -g root -m 644 \
+      /mnt/state/demo-$OIDC_PASSKEY_DEMO-sp-signing-cert.pem \
+      /etc/shibboleth/sp-signing-cert.pem
+    install -o root -g root -m 600 \
+      /mnt/state/demo-$OIDC_PASSKEY_DEMO-sp-signing-key.pem \
+      /etc/shibboleth/sp-signing-key.pem
+
+    xmlstarlet ed -L -O -N ns=urn:mace:shibboleth:3.0:native:sp:config \
+      -d "/ns:SPConfig/ns:ApplicationDefaults/ns:CredentialResolver[@type='File' and @use='encryption']" \
+      /etc/shibboleth/shibboleth2.xml
+
+    xmlstarlet ed -L -O -N ns=urn:mace:shibboleth:3.0:native:sp:config \
+      -d "/ns:SPConfig/ns:ApplicationDefaults/ns:Sessions/ns:Logout" \
+      /etc/shibboleth/shibboleth2.xml
+
+    xmlstarlet ed -L -O -N ns=urn:mace:shibboleth:3.0:native:sp:config \
+      -d "/ns:SPConfig/ns:ApplicationDefaults/ns:Sessions/ns:LogoutInitiator[@type='Admin']" \
+      /etc/shibboleth/shibboleth2.xml
+
+    xmlstarlet ed -L -O -N ns=urn:mace:shibboleth:3.0:native:sp:config \
+      -s /ns:SPConfig/ns:ApplicationDefaults/ns:Sessions \
+      -t elem -n LogoutInitiator \
+      -i //LogoutInitiator -t attr -n type -v Chaining \
+      -i //LogoutInitiator -t attr -n Location -v /Logout \
+      -i //LogoutInitiator -t attr -n relayState -v cookie \
+      /etc/shibboleth/shibboleth2.xml
+
+    xmlstarlet ed -L -O -N ns=urn:mace:shibboleth:3.0:native:sp:config \
+      -s /ns:SPConfig/ns:ApplicationDefaults/ns:Sessions/ns:LogoutInitiator \
+      -t elem -n LogoutInitiator \
+      -s //LogoutInitiator -t attr -n type -v SAML2 \
+      -s //LogoutInitiator -t attr -n template -v bindingTemplate.html \
+      /etc/shibboleth/shibboleth2.xml
+
+    xmlstarlet ed -L -O -N ns=urn:mace:shibboleth:3.0:native:sp:config \
+      -s /ns:SPConfig/ns:ApplicationDefaults/ns:Sessions/ns:LogoutInitiator \
+      -t elem -n LogoutInitiator \
+      -s //LogoutInitiator -t attr -n type -v Local \
+      /etc/shibboleth/shibboleth2.xml
+
+    # patch attribute-map.xml ("uncomment" entries)
+
+    xmlstarlet ed -L -O -N ns=urn:mace:shibboleth:2.0:attribute-map \
+      -s /ns:Attributes \
+      -t elem -n Attribute \
+      -i //Attribute -t attr -n name -v urn:oid:2.5.4.42 \
+      -i //Attribute -t attr -n id -v givenName \
+      /etc/shibboleth/attribute-map.xml
+
+    # launch shibd in background (see /lib/systemd/system/shibd.service)
+
+    mkdir /run/shibboleth
+    LD_LIBRARY_PATH=/opt/shibboleth/lib /usr/sbin/shibd -t
+    LD_LIBRARY_PATH=/opt/shibboleth/lib /usr/sbin/shibd -f
+    ;;
+  *)
+    exit 1
+  esac
 fi
 
 # update state

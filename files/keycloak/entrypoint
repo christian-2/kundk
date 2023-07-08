@@ -117,24 +117,93 @@ createSubflow() {
 
 store_client_secrets() {
   test $# -eq 3
-  echo "storing client secret for client $3"
-  client_secret=$(kcadm.sh get --config $config -r $2 \
+  demo=$1
+  realm=$2
+  client_id=$3
+
+  echo "storing client secret for client $client_id"
+  client_secret=$(kcadm.sh get --config $config -r $realm \
     clients | \
-    jq -r --arg clientId $3 \
+    jq -r --arg clientId $client_id \
       '.[] | select(.clientId == $clientId) | .secret')
   test -n "$client_secret"
-  echo $client_secret > /mnt/state/demo-$1-client-secret
+  echo $client_secret > /mnt/state/demo-$demo-client-secret
+}
+
+store_saml_idp_metadata() {
+  test $# -eq 3
+  demo=$1
+  realm=$2
+  client_id=$3
+
+  case $demo in
+  1|2)
+    ;;
+  3|4)
+    idp_entity_id=https://$KEYCLOAK_HOSTNAME:8444/realms/$realm
+    echo $idp_entity_id > /mnt/state/demo-$demo-idp-entity-id
+    sp_entity_id=$client_id
+    echo $sp_entity_id > /mnt/state/demo-$demo-sp-entity-id
+
+    id=$(kcadm.sh get --config $config -r $realm \
+      clients | \
+      jq -r --arg clientId $client_id \
+        '.[] | select(.clientId == $clientId) | .id')
+    test -n "$id"
+
+    attributes=$(mktemp)
+    kcadm.sh get --config $config -r $realm clients/$id | \
+      jq '.attributes' > $attributes
+    sp_signing_cert=$(cat $attributes | jq -r '."saml.signing.certificate"')
+    sp_signing_key=$(cat $attributes | jq -r '."saml.signing.private.key"')
+    test $sp_signing_cert != null
+    test $sp_signing_key != null
+    write_pem_cert $sp_signing_cert /mnt/state/demo-$demo-sp-signing-cert.pem \
+      644
+    write_pem_key $sp_signing_key /mnt/state/demo-$demo-sp-signing-key.pem \
+      644
+    test $(cat $attributes | jq 'has("saml.encrypt")') = false
+    rm $attributes
+    ;;
+  *)
+    exit 1
+  esac
+}
+
+write_pem_cert() {
+  test $# -eq 3
+  cert=$1
+  filename=$2
+  mode=$3
+
+  echo "-----BEGIN CERTIFICATE-----" > $filename
+  chmod $mode $filename
+  echo $cert >> $filename
+  echo "-----END CERTIFICATE-----" >> $filename
+}
+
+write_pem_key() {
+  test $# -eq 3
+  key=$1
+  filename=$2
+  mode=$3
+
+  echo "-----BEGIN RSA PRIVATE KEY-----" > $filename
+  chmod $mode $filename
+  echo $key >> $filename
+  echo "-----END RSA PRIVATE KEY-----" >> $filename
 }
 
 # create realms, etc., if necessary
 
-for demo in 1 2; do
+for demo in 1 2 3 4; do
   realm=oidc-passkey-demo-$demo
   client_id=demo-$demo-client
 
   if kcadm.sh get realms/$realm --config $config &> /dev/null; then
     echo "realm $realm already exists"
     store_client_secrets $demo $realm $client_id
+    store_saml_idp_metadata $demo $realm $client_id
     continue
   fi
 
@@ -144,32 +213,17 @@ for demo in 1 2; do
     -s enabled=true
 
   case $demo in
-  1)
+  1|3)
+    flow=demo-$demo-webauthn-passwordless
     required_action=webauthn-register-passwordless
-    ;;
-  2)
-    required_action=webauthn-register
-    ;;
-  *)
-    exit 1
-  esac
 
-  echo "enabling required action by default: $required_action"
-  kcadm.sh update --config $config -r $realm \
-    authentication/required-actions/$required_action \
-    -s defaultAction=true
+    subflow_1=$flow-subflow-1
+    subflow_2=$flow-subflow-2
+    subflow_3=$flow-subflow-3
+    subflow_4=$flow-subflow-4
 
-  flow=demo-$demo-webauthn
-  subflow_1=demo-$demo-webauthn-subflow-1
-
-  echo "creating flow $flow"
-  createFlow $realm $flow
-
-  case $demo in
-  1)
-    subflow_2=demo-$demo-webauthn-subflow-2
-    subflow_3=demo-$demo-webauthn-subflow-3
-    subflow_4=demo-$demo-webauthn-subflow-4
+    echo "creating flow $flow"
+    createFlow $realm $flow
 
     echo "creating execution auth-cookie in $flow"
     createExecution $realm $flow auth-cookie ALTERNATIVE
@@ -193,7 +247,15 @@ for demo in 1 2; do
     echo "creating execution webauthn-authenticator in $subflow_4"
     createExecution $realm $subflow_4 webauthn-authenticator ALTERNATIVE
     ;;
-  2)
+  2|4)
+    flow=demo-$demo-webauthn
+    required_action=webauthn-register
+
+    subflow_1=$flow-subflow-1
+
+    echo "creating flow $flow"
+    createFlow $realm $flow
+
     echo "creating execution auth-cookie in $flow"
     createExecution $realm $flow auth-cookie ALTERNATIVE
     echo "creating subflow $subflow_1 in $flow"
@@ -207,16 +269,55 @@ for demo in 1 2; do
     exit 1
   esac
 
-  echo "creating client $client_id"
-  kcadm.sh create clients --config $config -r $realm \
-    -s clientId=$client_id \
-    -s directAccessGrantsEnabled=false \
-    -s protocol=openid-connect \
-    -s publicClient=false \
-    -s 'redirectUris=["https://'$APACHE_HOSTNAME:$((9443 + $demo))'/vanity.html"]' \
-    -s 'attributes={"post.logout.redirect.uris":"'https://$APACHE_HOSTNAME'"}' \
-    -s standardFlowEnabled=true \
-    -s enabled=true
+  case $demo in
+  1|2)
+    redirect_uri="https://$APACHE_HOSTNAME:$((9443 + $demo))/vanity.html"
+    post_logout_redirect_uri="https://$APACHE_HOSTNAME"
+
+    echo "creating OIDC client $client_id"
+    kcadm.sh create clients --config $config -r $realm \
+      -s clientId=$client_id \
+      -s protocol=openid-connect \
+      -s directAccessGrantsEnabled=false \
+      -s publicClient=false \
+      -s 'redirectUris=["'$redirect_uri'"]' \
+      -s 'attributes={"post.logout.redirect.uris":"'$post_logout_redirect_uri'"}' \
+      -s standardFlowEnabled=true \
+      -s enabled=true
+    ;;
+  3|4)
+    redirect_uri="https://$APACHE_HOSTNAME:$((9443 + $demo))/*"
+    saml_assertion_consumer_url_post="https://$KEYCLOAK_HOSTNAME:8444/Shibboleth.sso/SAML2/POST"
+    saml_assertion_consumer_url_redirect="https://$APACHE_HOSTNAME:$((9443 + $demo))"
+
+    echo "creating SAML client $client_id"
+    kcadm.sh create clients --config $config -r $realm \
+      -s clientId=$client_id \
+      -s protocol=saml \
+      -s 'redirectUris=["'$redirect_uri'"]' \
+      -s 'attributes={"saml_assertion_consumer_url_post":"'$saml_assertion_consumer_url_post'","saml_assertion_consumer_url_redirect":"'$saml_assertion_consumer_url_redirect'"}' \
+      -s enabled=true
+
+    echo "creating protocol mapper for givenName"
+    id=$(kcadm.sh get --config $config -r $realm \
+      clients | \
+        jq -r --arg clientId $client_id \
+          '.[] | select(.clientId == $clientId) | .id')
+    kcadm.sh create clients/$id/protocol-mappers/models \
+      --config $config -r $realm \
+      -s 'name="X500 givenName"' \
+      -s protocol=saml \
+      -s protocolMapper=saml-user-property-mapper \
+      -s 'config={"attribute.nameformat":"urn:oasis:names:tc:SAML:2.0:attrname-format:uri","user.attribute":"firstName","friendly.name":"givenName","attribute.name":"urn:oid:2.5.4.42"}'
+    ;;
+  *)
+    exit 1
+  esac
+
+  echo "enabling required action by default: $required_action"
+  kcadm.sh update --config $config -r $realm \
+    authentication/required-actions/$required_action \
+    -s defaultAction=true
 
   echo "binding flow $flow to client $client_id's browser flow'"
   flow_id=$(kcadm.sh get --config $config -r $realm \
@@ -255,7 +356,14 @@ for demo in 1 2; do
     -s 'config.trustEmail=["true"]' \
     -s 'config.enabled=["true"]'
 
+  echo "allow read-only access to realm admin console"
+  kcadm.sh add-roles --config $config -r $realm \
+    --rname default-roles-$realm \
+    --cclientid realm-management \
+    --rolename view-realm --rolename view-clients
+
   store_client_secrets $demo $realm $client_id
+  store_saml_idp_metadata $demo $realm $client_id
 done
 
 # clean-up

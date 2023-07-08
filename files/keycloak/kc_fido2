@@ -3,7 +3,7 @@ set -e
 trap 'echo "error: $0:$LINENO"' ERR
 
 print_session() {
-  test $# -eq 9 -o $# -eq 12
+  test $# -eq 9 -o $# -eq 13
 
   realm=$1
   user_id=$2
@@ -16,13 +16,15 @@ print_session() {
   transports=$8
   created_date=$(date -d @${9::-3} +'%Y-%m-%d %H:%M %Z')
   if [ $# -eq 9 ]; then
+    protocols=-
     ip_address=-
     start=-
     client_ids=-
   else
-    ip_address=${10}
-    start=$(date -d @${11::-3} +'%Y-%m-%d %H:%M %Z')
-    client_ids=${12}
+    protocols=${10}
+    ip_address=${11}
+    start=$(date -d @${12::-3} +'%Y-%m-%d %H:%M %Z')
+    client_ids=${13}
   fi
 
   u=user
@@ -42,6 +44,7 @@ print_session() {
   printf "| $r | transports   | %s |\n" "$transports"
   printf "| $r | createdDate  | %s |\n" "$created_date"
   printf "| $a | clients      | %s |\n" "$client_ids"
+  printf "| $a | protocols    | %s |\n" "$protocols"
   printf "| $a | start        | %s |\n" "$start"
   printf "| $a | ipAddress    | %s |\n" "$ip_address"
 }
@@ -54,18 +57,19 @@ PATH=$PATH:/opt/keycloak/bin
 users=$(mktemp)
 credentials=$(mktemp)
 sessions=$(mktemp)
+client=$(mktemp)
 printf "# WebAuthn sessions\n"
 
-for demo in 1 2; do
+for demo in 1 2 3 4; do
   realm=oidc-passkey-demo-$demo
   kcadm.sh get --config $config -r $realm \
     users 2> /dev/null | jq 'sort_by(.username)' > $users
 
   case $demo in
-  1)
+  1|3)
     type=webauthn-passwordless
     ;;
-  2)
+  2|4)
     type=webauthn
     ;;
   *)
@@ -109,10 +113,19 @@ for demo in 1 2; do
           '.[] | select(.id == $id) | .start' $sessions)
         client_ids=$(jq -r --arg id $session_id \
           '.[] | select(.id == $id) | .clients | .[]' $sessions | paste -sd,)
+        protocols=$(for client_id in ${client_ids//,/ }; do
+            id=$(kcadm.sh get --config $config -r $realm \
+              clients 2> /dev/null | jq -r --arg client_id $client_id \
+                '.[] | select(.clientId == $client_id) | .id')
+            kcadm.sh get --config $config -r $realm \
+              clients/$id 2> /dev/null > $client
+            protocol=$(cat $client | jq -r '.protocol')
+            echo $protocol
+          done | paste -sd,)
         print_session \
          $realm $user_id $username \
          $credential_id $type "$user_label" $aaguid "$transports" $created_date \
-         $ip_address $start $client_ids
+         $protocols $ip_address $start $client_ids
       done
     fi
   done
@@ -120,3 +133,4 @@ done
 rm $users
 rm $credentials
 rm $sessions
+rm $client

@@ -2,8 +2,10 @@ FROM httpd
 
 RUN \
   apt-get -y update && \
-  apt-get install -y curl jq libapache2-mod-auth-openidc
+  apt-get install -y curl jq libapache2-mod-auth-openidc libapache2-mod-shib \
+    xmlstarlet
 
+COPY files/demo/demo.css /usr/local/apache2/htdocs/
 COPY files/state /usr/local/bin/
 
 STOPSIGNAL SIGWINCH
