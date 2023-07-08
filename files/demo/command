@@ -60,18 +60,6 @@ if [ -z "$OIDC_PASSKEY_DEMO" ]; then
 
   install -o www-data -g www-data -m 744 /dev/stdin \
     /usr/local/apache2/htdocs/index.html << EOF
-<<<<<<< HEAD
-<html><body>
-<h1>oidc-passkey</h1>
-EOF
-  for demo in 1 2; do
-    case $demo in
-    1)
-      description="authentication: FIDO passkey (1FA); registration: LDAP; protocol: OIDC"
-      ;;
-    2)
-      description="authentication: LDAP + FIDO passkey (2FA); registration: LDAP; protocol: OIDC"
-=======
 <html>
 <head>
 <link rel="stylesheet" href="demo.css">
@@ -119,24 +107,10 @@ EOF
       registration=LDAP
       idp="Keycloak (SAML 2.0)"
       sp="Apache (mod_shib)"
->>>>>>> feat/shib2
       ;;
     *)
       exit 1
     esac
-<<<<<<< HEAD
-    realm=oidc-passkey-demo-$demo
-    cat >> /usr/local/apache2/htdocs/index.html << EOF
-<li>
-<a href="https://$APACHE_HOSTNAME:$((9443 + $demo))">demo #$demo</a>:
-$description
-<ul>
-<li>
-<a href="https://$KEYCLOAK_HOSTNAME:8444/realms/$realm/account">account console</a>: e.g. remove registrations, add authenticators
-</li>
-</ul>
-</li>
-=======
 
     realm=oidc-passkey-demo-$demo
     demo_url=https://$APACHE_HOSTNAME:$((9443 + $demo))
@@ -164,10 +138,7 @@ EOF
   cat >> /usr/local/apache2/htdocs/index.html << EOF
 </body>
 </html>
->>>>>>> feat/shib2
 EOF
-  done
-  echo "</ul>" >> /usr/local/apache2/htdocs/index.html
 else
 
   # wait for Keycloak to be ready

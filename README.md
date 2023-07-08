@@ -55,6 +55,7 @@ and they allow read-only inspection of Keycloak configurations in specific realm
 ## Current Limitations
 
 * [Online LDAP Test Server](https://www.forumsys.com/2022/05/10/online-ldap-test-server/) `ldap.forumsys.com ` currently hardcoded
+* SAML attribute mapping and logout not yet fully functioning
 * Keycloak administration and account consoles not yet protected by 2FA
 * no YubiKey PINs enforced via WebAuthn policies in any of the demos
 * certificate renewal via ACME not yet fully implemented
