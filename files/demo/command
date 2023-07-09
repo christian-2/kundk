@@ -409,6 +409,7 @@ EOF
       -s /ns:Attributes \
       -t elem -n Attribute \
       -i //Attribute -t attr -n name -v urn:oid:2.5.4.42 \
+      -i //Attribute -t attr -n nameFormat -v urn:oasis:names:tc:SAML:2.0:attrname-format:basic \
       -i //Attribute -t attr -n id -v givenName \
       /etc/shibboleth/attribute-map.xml
 
