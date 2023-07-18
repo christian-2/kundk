@@ -4,10 +4,11 @@ trap 'echo "error: $0:$LINENO"' ERR
 
 cd $(dirname $0)/..
 
-docker volume rm state || true
-docker volume create state
+docker volume rm state &> /dev/null || true
+docker volume create state &> /dev/null
 dir=$(docker volume inspect state | jq -r '.[0].Mountpoint')
 test $EUID -eq 0
 sudo chmod 777 $dir
 
+docker compose -f docker-compose-demo.yaml up -d
 docker compose up -d

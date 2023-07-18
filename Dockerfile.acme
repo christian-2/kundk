@@ -1,9 +1,14 @@
 FROM neilpang/acme.sh
 
+COPY files/state /usr/local/bin/
+
 VOLUME /acme.sh
 VOLUME /mnt/state
 VOLUME /var/run/docker.sock
 
-COPY files/state /usr/local/bin/
+ENV ACME_EMAIL ""
+ENV APACHE_HOSTNAME ""
+ENV KEYCLOAK_HOSTNAME ""
+
 COPY files/acme/entrypoint /
 ENTRYPOINT ["/entrypoint"]

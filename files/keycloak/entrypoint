@@ -11,11 +11,11 @@ echo "KEYCLOAK_LOG_LEVEL=$KEYCLOAK_LOG_LEVEL"
 echo "POSTGRES_KEYCLOAK_PASSWORD=$(echo $POSTGRES_KEYCLOAK_PASSWORD | \
   sed s/./\*/g)"
 
-test -n "$APACHE_HOSTNAME"
-test -n "$KEYCLOAK_ADMIN_PASSWORD"
-test -n "$KEYCLOAK_HOSTNAME"
-test -n "$KEYCLOAK_LOG_LEVEL"
-test -n "$POSTGRES_KEYCLOAK_PASSWORD"
+[[ -n "$APACHE_HOSTNAME" ]] || APACHE_HOSTNAME=$(hostname -f)
+[[ -n "$KEYCLOAK_ADMIN_PASSWORD" ]]
+[[ -n "$KEYCLOAK_HOSTNAME" ]] || KEYCLOAK_HOSTNAME=$(hostname -f)
+[[ -n "$KEYCLOAK_LOG_LEVEL" ]]
+[[ -n "$POSTGRES_KEYCLOAK_PASSWORD" ]]
 
 # wait for ACME certificate to have arrived
 

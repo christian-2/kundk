@@ -6,8 +6,8 @@ echo "APACHE_HOSTNAME=$APACHE_HOSTNAME"
 echo "KEYCLOAK_HOSTNAME=$KEYCLOAK_HOSTNAME"
 
 test -n "$ACME_EMAIL"
-test -n "$APACHE_HOSTNAME"
-test -n "$KEYCLOAK_HOSTNAME"
+test -n "$APACHE_HOSTNAME" || APACHE_HOSTNAME=$(hostname -f)
+test -n "$KEYCLOAK_HOSTNAME" || KEYCLOAK_HOSTNAME=$(hostname -f)
 
 # update account with email address
 

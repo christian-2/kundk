@@ -4,7 +4,7 @@ trap 'echo "error: $0:$LINENO"' ERR
 
 cd $(dirname $0)/..
 
-docker volume rm acme data state || true
+docker volume rm acme data state &> /dev/null || true
 
-docker volume create acme
-docker volume create data
+docker volume create acme &> /dev/null
+docker volume create data &> /dev/null
