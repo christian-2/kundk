@@ -8,6 +8,7 @@ echo "APACHE_HOSTNAME=$APACHE_HOSTNAME"
 echo "KEYCLOAK_ADMIN_PASSWORD=$(echo $KEYCLOAK_ADMIN_PASSWORD | sed s/./\*/g)"
 echo "KEYCLOAK_HOSTNAME=$KEYCLOAK_HOSTNAME"
 echo "KEYCLOAK_LOG_LEVEL=$KEYCLOAK_LOG_LEVEL"
+echo "LDAP_URL=$LDAP_URL"
 echo "POSTGRES_KEYCLOAK_PASSWORD=$(echo $POSTGRES_KEYCLOAK_PASSWORD | \
   sed s/./\*/g)"
 
@@ -210,6 +211,10 @@ for demo in 1 2 3 4; do
   echo "creating realm $realm"
   kcadm.sh create realms --config $config \
     -s realm=$realm \
+    -s 'displayName="demo #'$demo'"' \
+    -s resetPasswordAllowed=true \
+    -s registrationAllowed=true \
+    -s verifyEmail=true \
     -s enabled=true
 
   case $demo in
@@ -335,51 +340,53 @@ for demo in 1 2 3 4; do
     kcadm.sh update --config $config -r $realm \
       clients/$id -f -
 
-  echo "creating LDAP user storage provider"
-  kcadm.sh create components --config $config -r $realm \
-    -s providerType=org.keycloak.storage.UserStorageProvider \
-    -s providerId=ldap \
-    -s name="LDAP Test Server" \
-    -s 'config.vendor=["other"]' \
-    -s 'config.connectionUrl=["ldap://ldap.forumsys.com:389"]' \
-    -s 'config.startTls=["false"]' \
-    -s 'config.authType=["simple"]' \
-    -s 'config.bindDn=["cn=read-only-admin,dc=example,dc=com"]' \
-    -s 'config.bindCredential=["password"]' \
-    -s 'config.editMode=["READ_ONLY"]' \
-    -s 'config.usersDn=["dc=example,dc=com"]' \
-    -s 'config.usernameLDAPAttribute=["uid"]' \
-    -s 'config.rdnLDAPAttribute=["uid"]' \
-    -s 'config.uuidLDAPAttribute=["entryUUID"]' \
-    -s 'config.userObjectClasses=["inetOrgPerson"]' \
-    -s 'config.syncRegistrations=["false"]' \
-    -s 'config.trustEmail=["true"]' \
-    -s 'config.enabled=["true"]'
+  if [ -n "$LDAP_URL" ]; then
+    echo "creating LDAP user storage provider"
+    kcadm.sh create components --config $config -r $realm \
+      -s providerType=org.keycloak.storage.UserStorageProvider \
+      -s providerId=ldap \
+      -s name="LDAP Test Server" \
+      -s 'config.vendor=["other"]' \
+      -s 'config.connectionUrl=["'$LDAP_URL'"]' \
+      -s 'config.startTls=["false"]' \
+      -s 'config.authType=["simple"]' \
+      -s 'config.bindDn=["cn=read-only-admin,dc=example,dc=com"]' \
+      -s 'config.bindCredential=["password"]' \
+      -s 'config.editMode=["READ_ONLY"]' \
+      -s 'config.usersDn=["dc=example,dc=com"]' \
+      -s 'config.usernameLDAPAttribute=["uid"]' \
+      -s 'config.rdnLDAPAttribute=["uid"]' \
+      -s 'config.uuidLDAPAttribute=["entryUUID"]' \
+      -s 'config.userObjectClasses=["inetOrgPerson"]' \
+      -s 'config.syncRegistrations=["false"]' \
+      -s 'config.trustEmail=["true"]' \
+      -s 'config.enabled=["true"]'
 
-  case $demo in
-  1|2)
+    case $demo in
+    1|2)
+      ;;
+    3|4)
+      echo "deleting LDAP mapper of type user-attribute-ldap-mapper"
+      id=$(kcadm.sh get --config $config -r $realm components | \
+        jq -r '.[] | select(.providerType=="org.keycloak.storage.ldap.mappers.LDAPStorageMapper" and .providerId=="user-attribute-ldap-mapper" and .name=="first name") | .id')
+      test -n "$id"
+      kcadm.sh delete --config $config -r $realm components/$id
+
+      echo "creating LDAP mapper of type full-name-ldap-mapper"
+      id=$(kcadm.sh get --config $config -r $realm components | \
+        jq -r '.[] | select(.providerType=="org.keycloak.storage.UserStorageProvider" and .providerId=="ldap" and .name=="LDAP Test Server") | .id')
+      test -n "$id"
+      kcadm.sh create --config $config -r $realm components \
+        -s providerType=org.keycloak.storage.ldap.mappers.LDAPStorageMapper \
+        -s providerId=full-name-ldap-mapper \
+        -s parentId=$id \
+        -s name="full name" \
+        -s 'config={"read.only":["true"],"write.only":["false"],"ldap.full.name.attribute":["cn"]}'
     ;;
-  3|4)
-    echo "deleting LDAP mapper of type user-attribute-ldap-mapper"
-    id=$(kcadm.sh get --config $config -r $realm components | \
-      jq -r '.[] | select(.providerType=="org.keycloak.storage.ldap.mappers.LDAPStorageMapper" and .providerId=="user-attribute-ldap-mapper" and .name=="first name") | .id')
-    test -n "$id"
-    kcadm.sh delete --config $config -r $realm components/$id
-
-    echo "creating LDAP mapper of type full-name-ldap-mapper"
-    id=$(kcadm.sh get --config $config -r $realm components | \
-      jq -r '.[] | select(.providerType=="org.keycloak.storage.UserStorageProvider" and .providerId=="ldap" and .name=="LDAP Test Server") | .id')
-    test -n "$id"
-    kcadm.sh create --config $config -r $realm components \
-      -s providerType=org.keycloak.storage.ldap.mappers.LDAPStorageMapper \
-      -s providerId=full-name-ldap-mapper \
-      -s parentId=$id \
-      -s name="full name" \
-      -s 'config={"read.only":["true"],"write.only":["false"],"ldap.full.name.attribute":["cn"]}'
-  ;;
-  *)
-    exit 1
-  esac
+    *)
+      exit 1
+    esac
+  fi
 
   echo "allow read-only access to realm admin console"
   kcadm.sh add-roles --config $config -r $realm \

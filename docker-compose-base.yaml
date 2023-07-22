@@ -1,4 +1,5 @@
 version: "3.2"
+name: base
 services:
   acme:
     image: oidc-passkey/acme
@@ -40,6 +41,7 @@ services:
     - KEYCLOAK_ADMIN_PASSWORD
     - KEYCLOAK_HOSTNAME
     - KEYCLOAK_LOG_LEVEL
+    - LDAP_URL
     - POSTGRES_KEYCLOAK_PASSWORD
     volumes:
     - state:/mnt/state

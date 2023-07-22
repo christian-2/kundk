@@ -10,5 +10,5 @@ dir=$(docker volume inspect state | jq -r '.[0].Mountpoint')
 test $EUID -eq 0
 sudo chmod 777 $dir
 
+docker compose -f docker-compose-base.yaml up -d
 docker compose -f docker-compose-demo.yaml up -d
-docker compose up -d

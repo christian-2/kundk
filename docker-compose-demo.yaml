@@ -1,4 +1,5 @@
 version: "3.2"
+name: demo
 services:
   demo:
     image: oidc-passkey/demo

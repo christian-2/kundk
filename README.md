@@ -24,22 +24,33 @@ curl -o blob.jwt -L https://mds3.fidoalliance.org
 sudo ./bin/start
 ```
 
+### ENVs for docker-compose.yaml
+
 | `ENV` | | example |
 | --- | --- | --- |
 | `ACME_EMAIL` | | (email address) |
-| `APACHE_EMAIL` | | (email address) |
 | `APACHE_HOSTNAME` | 1. | (FQDN) |
-| [`APACHE_LOG_LEVEL`](https://httpd.apache.org/docs/2.4/en/mod/core.html#loglevel) | | `info` |
 | `KEYCLOAK_ADMIN_PASSWORD` | 2. | (password) |
 | `KEYCLOAK_HOSTNAME` | 1. | (FQDN) |
 | [`KEYCLOAK_LOG_LEVEL`](https://www.keycloak.org/server/all-config?q=log-level) | | `info` |
-| [`KEYCLOAK_OIDC_REMOTE_USER_CLAIM`](https://github.com/OpenIDC/mod_auth_openidc/blob/master/auth_openidc.conf) | | `given_name ^(.+?)(?:\s.+)?$ $1` |
-| [`KEYCLOAK_OIDC_SCOPE`](https://github.com/OpenIDC/mod_auth_openidc/blob/master/auth_openidc.conf) | | `openid profile`
+| `LDAP_URL` | 3. | `ldap://ldap.forumsys.com:389` |
 | `POSTGRES_KEYCLOAK_PASSWORD` | 2. | (password) |
 | `POSTGRES_PASSWORD` | 2. | (password) |
 
-1. optional; default `$(hostname -f)` applies
+1. optional; default is `$(hostname -f)`
 2. choose a password
+3. optional
+
+### ENVs for docker-compose-demo.yaml
+
+| `ENV` | | example |
+| --- | --- | --- |
+| `APACHE_EMAIL` | | (see above) |
+| `APACHE_HOSTNAME` | | (see above) |
+| [`APACHE_LOG_LEVEL`](https://httpd.apache.org/docs/2.4/en/mod/core.html#loglevel) | | `info` |
+| `KEYCLOAK_HOSTNAME` | | (see above) |
+| [`KEYCLOAK_OIDC_REMOTE_USER_CLAIM`](https://github.com/OpenIDC/mod_auth_openidc/blob/master/auth_openidc.conf) | | `given_name ^(.+?)(?:\s.+)?$ $1` |
+| [`KEYCLOAK_OIDC_SCOPE`](https://github.com/OpenIDC/mod_auth_openidc/blob/master/auth_openidc.conf) | | `openid profile`
 
 ## Demos
 
