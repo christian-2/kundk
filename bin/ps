@@ -1,8 +1,0 @@
-#!/bin/bash
-set -e
-trap 'echo "error: $0:$LINENO"' ERR
-
-cd $(dirname $0)/..
-
-docker compose -f docker-compose-base.yaml ps
-docker compose -f docker-compose-demo.yaml ps | sed -e '1,1d'

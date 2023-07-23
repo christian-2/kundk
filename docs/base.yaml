@@ -1,0 +1,131 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-base
+data:
+  ACME_EMAIL:
+  APACHE_HOSTNAME:
+  KEYCLOAK_HOSTNAME:
+  KEYCLOAK_LOG_LEVEL: info
+  LDAP_URL:
+---
+apiVersion: apps/v1
+kind: Pod
+metadata:
+  name: acme
+spec:
+  containers:
+  - name: acme
+    image: acme
+    args:
+    - daemon
+    env:
+    - name: ACME_EMAIL
+      valueFrom:
+        configMapKeyRef:
+          name: config-base
+          key: ACME_EMAIL
+    - name: APACHE_HOSTNAME
+      valueFrom:
+        configMapKeyRef:
+          name: config-base
+          key: APACHE_HOSTNAME
+    - name: KEYCLOAK_HOSTNAME
+      valueFrom:
+        configMapKeyRef:
+          name: config-base
+          key: KEYCLOAK_HOSTNAME
+    volumeMounts:
+    - name: acme
+      mountPath: /acme.sh
+    - name: state
+      mountPath: /mnt/state
+  hostNetwork: true
+  volumes:
+  - name: acme
+    persistentVolumeClaim:
+      claimName: acme
+  - name: state
+    persistentVolumeClaim:
+      claimName: state
+---
+apiVersion: apps/v1
+kind: Pod
+metadata:
+  name: db
+spec:
+  containers:
+  - name: db
+    image: db
+    env:
+    - name: POSTGRES_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: postgres-password
+          key: password
+    - name: POSTGRES_KEYCLOAK_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: postgres-keycloak-password
+          key: password
+    volumeMounts:
+    - name: data
+      mountPath: /var/lib/postgresql/data
+    - name: state
+      mountPath: /mnt/state
+  hostNetwork: true
+  volumes:
+  - name: data
+    persistentVolumeClaim:
+      claimName: data
+  - name: state
+    persistentVolumeClaim:
+      claimName: state
+---
+apiVersion: apps/v1
+kind: Pod
+metadata:
+  name: keycloak
+spec:
+  containers:
+  - name: keycloak
+    image: keycloak
+    env:
+    - name: APACHE_HOSTNAME
+      valueFrom:
+        configMapKeyRef:
+          name: config-base
+          key: APACHE_HOSTNAME
+    - name: KEYCLOAK_ADMIN_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: keycloak-admin-password
+          key: password
+    - name: KEYCLOAK_HOSTNAME
+      valueFrom:
+        configMapKeyRef:
+          name: config-base
+          key: KEYCLOAK_HOSTNAME
+    - name: KEYCLOAK_LOG_LEVEL
+      valueFrom:
+        configMapKeyRef:
+          name: config-base
+          key: KEYCLOAK_LOG_LEVEL
+    - name: LDAP_URL
+      valueFrom:
+        configMapKeyRef:
+          name: config-base
+          key: LDAP_URL
+    - name: POSTGRES_KEYCLOAK_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: postgres-keycloak-password
+          key: password
+    volumeMounts:
+    - name: state
+      mountPath: /mnt/state
+  hostNetwork: true
+  volumes:
+  - name: state
+    persistentVolumeClaim:
+      claimName: state

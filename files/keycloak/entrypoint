@@ -12,11 +12,19 @@ echo "LDAP_URL=$LDAP_URL"
 echo "POSTGRES_KEYCLOAK_PASSWORD=$(echo $POSTGRES_KEYCLOAK_PASSWORD | \
   sed s/./\*/g)"
 
-[[ -n "$APACHE_HOSTNAME" ]] || APACHE_HOSTNAME=$(hostname -f)
+. /usr/local/bin/issue_19321
+
+[[ -n "$APACHE_HOSTNAME" ]] || APACHE_HOSTNAME=$(fqdn_19321)
 [[ -n "$KEYCLOAK_ADMIN_PASSWORD" ]]
-[[ -n "$KEYCLOAK_HOSTNAME" ]] || KEYCLOAK_HOSTNAME=$(hostname -f)
+[[ -n "$KEYCLOAK_HOSTNAME" ]] || KEYCLOAK_HOSTNAME=$(fqdn_19321)
 [[ -n "$KEYCLOAK_LOG_LEVEL" ]]
 [[ -n "$POSTGRES_KEYCLOAK_PASSWORD" ]]
+
+# download blob.jwt, if necessary
+
+if [[ ! -f /mnt/state/blow.jwt ]]; then
+  curl -o /mnt/state/blob.jwt -L https://mds3.fidoalliance.org
+fi
 
 # wait for ACME certificate to have arrived
 

@@ -2,7 +2,9 @@
 set -e
 trap 'echo "error: $0:$LINENO"' ERR
 
-[[ -n "$KEYCLOAK_HOSTNAME" ]] || KEYCLOAK_HOSTNAME=$(hostname -f)
+. /usr/local/bin/issue_19321
+
+[[ -n "$KEYCLOAK_HOSTNAME" ]] || KEYCLOAK_HOSTNAME=$(fqdn_19321)
 [[ -n "$KEYCLOAK_ADMIN_PASSWORD" ]]
 
 config=/var/run/keycloak/kcadm.config

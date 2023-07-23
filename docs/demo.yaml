@@ -1,0 +1,245 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-demo
+data:
+  ACME_EMAIL:
+  APACHE_EMAIL:
+  APACHE_HOSTNAME:
+  APACHE_LOG_LEVEL: info
+  KEYCLOAK_HOSTNAME:
+  KEYCLOAK_OIDC_REMOTE_USER_CLAIM:
+  KEYCLOAK_OIDC_SCOPE:
+---
+kind: Pod
+metadata:
+  name: demo
+spec:
+  containers:
+  - name: demo
+    image: demo
+    env:
+    - name: APACHE_EMAIL
+      valueFrom:
+        configMapKeyRef:
+          name: config-demo
+          key: APACHE_EMAIL
+    - name: APACHE_HOSTNAME
+      valueFrom:
+        configMapKeyRef:
+          name: config-demo
+          key: APACHE_HOSTNAME
+    - name: APACHE_LOG_LEVEL
+      valueFrom:
+        configMapKeyRef:
+          name: config-demo
+          key: APACHE_LOG_LEVEL
+    - name: KEYCLOAK_HOSTNAME
+      valueFrom:
+        configMapKeyRef:
+          name: config-demo
+          key: KEYCLOAK_HOSTNAME
+    volumeMounts:
+    - name: state
+      mountPath: /mnt/state
+  hostNetwork: true
+  volumes:
+  - name: state
+    persistentVolumeClaim:
+      claimName: state
+---
+kind: Pod
+metadata:
+  name: demo-1
+spec:
+  containers:
+  - name: demo-1
+    image: demo
+    env:
+    - name: APACHE_EMAIL
+      valueFrom:
+        configMapKeyRef:
+          name: config-demo
+          key: APACHE_EMAIL
+    - name: APACHE_HOSTNAME
+      valueFrom:
+        configMapKeyRef:
+          name: config-demo
+          key: APACHE_HOSTNAME
+    - name: APACHE_LOG_LEVEL
+      valueFrom:
+        configMapKeyRef:
+          name: config-demo
+          key: APACHE_LOG_LEVEL
+    - name: KEYCLOAK_HOSTNAME
+      valueFrom:
+        configMapKeyRef:
+          name: config-demo
+          key: KEYCLOAK_HOSTNAME
+    - name: KEYCLOAK_OIDC_REMOTE_USER_CLAIM
+      valueFrom:
+        configMapKeyRef:
+          name: config-demo
+          key: KEYCLOAK_OIDC_REMOTE_USER_CLAIM
+    - name: KEYCLOAK_OIDC_SCOPE
+      valueFrom:
+        configMapKeyRef:
+          name: config-demo
+          key: KEYCLOAK_OIDC_SCOPE
+    - name: OIDC_PASSKEY_DEMO
+      value: 1
+    volumeMounts:
+    - name: state
+      mountPath: /mnt/state
+  hostNetwork: true
+  volumes:
+  - name: state
+    persistentVolumeClaim:
+      claimName: state
+---
+kind: Pod
+metadata:
+  name: demo-2
+spec:
+  containers:
+  - name: demo-2
+    image: demo
+    env:
+    - name: APACHE_EMAIL
+      valueFrom:
+        configMapKeyRef:
+          name: config-demo
+          key: APACHE_EMAIL
+    - name: APACHE_HOSTNAME
+      valueFrom:
+        configMapKeyRef:
+          name: config-demo
+          key: APACHE_HOSTNAME
+    - name: APACHE_LOG_LEVEL
+      valueFrom:
+        configMapKeyRef:
+          name: config-demo
+          key: APACHE_LOG_LEVEL
+    - name: KEYCLOAK_HOSTNAME
+      valueFrom:
+        configMapKeyRef:
+          name: config-demo
+          key: KEYCLOAK_HOSTNAME
+    - name: KEYCLOAK_OIDC_REMOTE_USER_CLAIM
+      valueFrom:
+        configMapKeyRef:
+          name: config-demo
+          key: KEYCLOAK_OIDC_REMOTE_USER_CLAIM
+    - name: KEYCLOAK_OIDC_SCOPE
+      valueFrom:
+        configMapKeyRef:
+          name: config-demo
+          key: KEYCLOAK_OIDC_SCOPE
+    - name: OIDC_PASSKEY_DEMO
+      value: 2
+    volumeMounts:
+    - name: state
+      mountPath: /mnt/state
+  hostNetwork: true
+  volumes:
+  - name: state
+    persistentVolumeClaim:
+      claimName: state
+---
+kind: Pod
+metadata:
+  name: demo-3
+spec:
+  containers:
+  - name: demo-3
+    image: demo
+    env:
+    - name: APACHE_EMAIL
+      valueFrom:
+        configMapKeyRef:
+          name: config-demo
+          key: APACHE_EMAIL
+    - name: APACHE_HOSTNAME
+      valueFrom:
+        configMapKeyRef:
+          name: config-demo
+          key: APACHE_HOSTNAME
+    - name: APACHE_LOG_LEVEL
+      valueFrom:
+        configMapKeyRef:
+          name: config-demo
+          key: APACHE_LOG_LEVEL
+    - name: KEYCLOAK_HOSTNAME
+      valueFrom:
+        configMapKeyRef:
+          name: config-demo
+          key: KEYCLOAK_HOSTNAME
+    - name: KEYCLOAK_OIDC_REMOTE_USER_CLAIM
+      valueFrom:
+        configMapKeyRef:
+          name: config-demo
+          key: KEYCLOAK_OIDC_REMOTE_USER_CLAIM
+    - name: KEYCLOAK_OIDC_SCOPE
+      valueFrom:
+        configMapKeyRef:
+          name: config-demo
+          key: KEYCLOAK_OIDC_SCOPE
+    - name: OIDC_PASSKEY_DEMO
+      value: 3
+    volumeMounts:
+    - name: state
+      mountPath: /mnt/state
+  hostNetwork: true
+  volumes:
+  - name: state
+    persistentVolumeClaim:
+      claimName: state
+---
+kind: Pod
+metadata:
+  name: demo-4
+spec:
+  containers:
+  - name: demo-4
+    image: demo
+    env:
+    - name: APACHE_EMAIL
+      valueFrom:
+        configMapKeyRef:
+          name: config-demo
+          key: APACHE_EMAIL
+    - name: APACHE_HOSTNAME
+      valueFrom:
+        configMapKeyRef:
+          name: config-demo
+          key: APACHE_HOSTNAME
+    - name: APACHE_LOG_LEVEL
+      valueFrom:
+        configMapKeyRef:
+          name: config-demo
+          key: APACHE_LOG_LEVEL
+    - name: KEYCLOAK_HOSTNAME
+      valueFrom:
+        configMapKeyRef:
+          name: config-demo
+          key: KEYCLOAK_HOSTNAME
+    - name: KEYCLOAK_OIDC_REMOTE_USER_CLAIM
+      valueFrom:
+        configMapKeyRef:
+          name: config-demo
+          key: KEYCLOAK_OIDC_REMOTE_USER_CLAIM
+    - name: KEYCLOAK_OIDC_SCOPE
+      valueFrom:
+        configMapKeyRef:
+          name: config-demo
+          key: KEYCLOAK_OIDC_SCOPE
+    - name: OIDC_PASSKEY_DEMO
+      value: 4
+    volumeMounts:
+    - name: state
+      mountPath: /mnt/state
+  hostNetwork: true
+  volumes:
+  - name: state
+    persistentVolumeClaim:
+      claimName: state

@@ -5,9 +5,11 @@ echo "ACME_EMAIL=$ACME_EMAIL"
 echo "APACHE_HOSTNAME=$APACHE_HOSTNAME"
 echo "KEYCLOAK_HOSTNAME=$KEYCLOAK_HOSTNAME"
 
+. /usr/local/bin/issue_19321
+
 test -n "$ACME_EMAIL"
-test -n "$APACHE_HOSTNAME" || APACHE_HOSTNAME=$(hostname -f)
-test -n "$KEYCLOAK_HOSTNAME" || KEYCLOAK_HOSTNAME=$(hostname -f)
+test -n "$APACHE_HOSTNAME" || APACHE_HOSTNAME=$(fqdn_19321)
+test -n "$KEYCLOAK_HOSTNAME" || KEYCLOAK_HOSTNAME=$(fqdn_19321)
 
 # update account with email address
 

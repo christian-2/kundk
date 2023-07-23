@@ -1,4 +1,4 @@
-FROM postgres
+FROM docker.io/postgres
 
 COPY files/state /usr/loca/bin/
 COPY files/db/??_*.sh /docker-entrypoint-initdb.d/

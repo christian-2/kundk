@@ -13,44 +13,64 @@ So what aspects are different with this one:
   (Keycloak, PostgreSQL, acme.sh, five Apaches for demos)
 * under Apache License (like Keycloak)
 
+## Requirements
+
+* e.g. Debian 12.1
+* e.g. Podman 4.3.1
+
 ## Installation
 
 ```
-./bin/build
-cp docs/env.example .env
-editor .env
-curl -o blob.jwt -L https://mds3.fidoalliance.org
+./bin/build --no-cache
+cp docs/{base,demo}.yaml k8s
+editor k8s/{base,demo}.yaml # 1.
+echo '{"password":"HIDDEN"}' | \
+  podman secret create --driver file keycloak-admin-password - # 2.
+echo '{"password":"HIDDEN"}' | \
+  podman secret create --driver file postgres-keycloak-password - # 2.
+echo '{"password":"HIDDEN"}' | \
+  podman secret create --driver file postgres-password - # 2.
 ./bin/reset
-sudo ./bin/start
+./bin/start
 ```
 
-### ENVs for docker-compose.yaml
+1. see sections Configuration for base, Configuration for demo
+2. e.g. Podman 4.3.1 requires workaround for issue [#16269](https://github.com/containers/podman/issues/16269);
+   see section Secrets for base
 
-| `ENV` | | example |
+### Configuration for base
+
+| env | | example |
 | --- | --- | --- |
 | `ACME_EMAIL` | | (email address) |
 | `APACHE_HOSTNAME` | 1. | (FQDN) |
-| `KEYCLOAK_ADMIN_PASSWORD` | 2. | (password) |
 | `KEYCLOAK_HOSTNAME` | 1. | (FQDN) |
 | [`KEYCLOAK_LOG_LEVEL`](https://www.keycloak.org/server/all-config?q=log-level) | | `info` |
-| `LDAP_URL` | 3. | `ldap://ldap.forumsys.com:389` |
-| `POSTGRES_KEYCLOAK_PASSWORD` | 2. | (password) |
-| `POSTGRES_PASSWORD` | 2. | (password) |
+| `LDAP_URL` | 2. | `ldap://ldap.forumsys.com:389` |
 
-1. optional; default is `$(hostname -f)`
-2. choose a password
-3. optional
+1. optional; default: `$(hostname -f)`
+2. optional
 
-### ENVs for docker-compose-demo.yaml
+### Secrets for base
 
-| `ENV` | | example |
+| secret |
+| --- |
+| `keycloak-admin-password` |
+| `postgres-keycloak-password` |
+| `postgres-password` |
+
+### Configuration for demo
+
+| env | | example |
 | --- | --- | --- |
-| `APACHE_EMAIL` | | (see above) |
-| `APACHE_HOSTNAME` | | (see above) |
+| `APACHE_EMAIL` | | (email address) |
+| `APACHE_HOSTNAME` | | 1. |
 | [`APACHE_LOG_LEVEL`](https://httpd.apache.org/docs/2.4/en/mod/core.html#loglevel) | | `info` |
-| `KEYCLOAK_HOSTNAME` | | (see above) |
+| `KEYCLOAK_HOSTNAME` | | 1. |
 | [`KEYCLOAK_OIDC_REMOTE_USER_CLAIM`](https://github.com/OpenIDC/mod_auth_openidc/blob/master/auth_openidc.conf) | | `given_name ^(.+?)(?:\s.+)?$ $1` |
 | [`KEYCLOAK_OIDC_SCOPE`](https://github.com/OpenIDC/mod_auth_openidc/blob/master/auth_openidc.conf) | | `openid profile`
+
+1. optional; default: `$(hostname -f)`
 
 ## Demos
 
@@ -72,4 +92,4 @@ and they allow read-only inspection of Keycloak configurations in specific realm
 * Keycloak administration and account consoles not yet protected by 2FA
 * no YubiKey PINs enforced via WebAuthn policies in any of the demos
 * certificate renewal via ACME not yet fully implemented
-* signature on `blob.jwt` not yet checked
+* signature on `blob.jwt` not yet checked and `blow.jwt` not refreshed
