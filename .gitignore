@@ -1,4 +1,5 @@
 *.swp
 /blob.jwt
+/state
 k8s/base.yaml
 k8s/demo.yaml

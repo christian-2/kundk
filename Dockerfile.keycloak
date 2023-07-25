@@ -24,11 +24,11 @@ RUN /opt/keycloak/bin/kc.sh build \
 FROM quay.io/keycloak/keycloak:${KEYCLOAK_VERSION}
 
 RUN test $(id -u) -eq 1000 -a $(id -g) -eq 0
-USER 0
+USER 0:0
 COPY --from=package-builder /mnt/rootfs/ /
 RUN install -o 1000 -g 0 -d /var/run/keycloak
 RUN install -o 1000 -g 0 -d /var/lib/keycloak
-USER 1000
+USER 1000:1000
 
 COPY --from=keycloak-builder /opt/keycloak/ /opt/keycloak/
 

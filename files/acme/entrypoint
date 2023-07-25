@@ -13,7 +13,8 @@ test -n "$KEYCLOAK_HOSTNAME" || KEYCLOAK_HOSTNAME=$(fqdn_19321)
 
 # update account with email address
 
-acme.sh --register-account -m $ACME_EMAIL
+debug=1
+acme.sh --debug $debug --register-account -m $ACME_EMAIL
 
 # update state
 
@@ -27,16 +28,20 @@ set_state STARTED /mnt/state/state.acme
 grep ^DEFAULT_DOMAIN_KEY_LENGTH=ec /usr/local/bin/acme.sh
 
 if [ ! -f /acme.sh/${APACHE_HOSTNAME}_ecc/$APACHE_HOSTNAME.cer ]; then
-  acme.sh --issue -d $APACHE_HOSTNAME --standalone --httpport 8445
+  acme.sh --debug $debug \
+    --issue -d $APACHE_HOSTNAME --standalone --httpport 8445
 else
-  acme.sh --renew -d $APACHE_HOSTNAME --standalone --httpport 8445 || true
+  acme.sh --debug $debug \
+     --renew -d $APACHE_HOSTNAME --standalone --httpport 8445 || true
 fi
 
 if [ $APACHE_HOSTNAME != $KEYCLOAK_HOSTNAME ]; then
   if [ ! -f /acme.sh/${KEYCLOAK_HOSTNAME}_ecc/$KEYCLOAK_HOSTNAME.cer ]; then
-    acme.sh --issue -d $KEYCLOAK_HOSTNAME --standalone --httpport 8445
+    acme.sh --debug $debug \
+       --issue -d $KEYCLOAK_HOSTNAME --standalone --httpport 8445
   else
-    acme.sh --renew -d $KEYCLOAK_HOSTNAME --standalone --httpport 8445 || true
+    acme.sh --debug $debug \
+       --renew -d $KEYCLOAK_HOSTNAME --standalone --httpport 8445 || true
   fi
 fi
 

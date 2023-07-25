@@ -4,8 +4,9 @@ trap 'echo "error: $0:$LINENO"' ERR
 
 cd $(dirname $0)/..
 
-podman volume rm state &> /dev/null || true
-podman volume create state &> /dev/null
+rm -fr state
+install -m 775 -d state
+podman unshare chown 0:1000 state
 
-podman kube play --replace k8s/base.yaml
-podman kube play --replace k8s/demo.yaml
+podman kube play --replace k8s/base.yaml &> /dev/null
+podman kube play --replace k8s/demo.yaml &> /dev/null

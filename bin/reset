@@ -4,7 +4,8 @@ trap 'echo "error: $0:$LINENO"' ERR
 
 cd $(dirname $0)/..
 
-podman volume rm acme data state &> /dev/null || true
+podman volume rm acme data &> /dev/null || true
+rm -fr state
 
 podman volume create acme &> /dev/null
 podman volume create data &> /dev/null

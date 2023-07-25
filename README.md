@@ -22,6 +22,7 @@ So what aspects are different with this one:
 
 ```
 ./bin/build --no-cache
+mkdir k8s
 cp docs/{base,demo}.yaml k8s
 editor k8s/{base,demo}.yaml # 1.
 echo '{"password":"HIDDEN"}' | \
