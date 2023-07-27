@@ -45,8 +45,9 @@ spec:
   hostNetwork: true
   volumes:
   - name: state
-    persistentVolumeClaim:
-      claimName: state
+    hostPath:
+      path: ./state
+      type: Directory
 ---
 kind: Pod
 metadata:
@@ -94,8 +95,9 @@ spec:
   hostNetwork: true
   volumes:
   - name: state
-    persistentVolumeClaim:
-      claimName: state
+    hostPath:
+      path: ./state
+      type: Directory
 ---
 kind: Pod
 metadata:
@@ -143,8 +145,9 @@ spec:
   hostNetwork: true
   volumes:
   - name: state
-    persistentVolumeClaim:
-      claimName: state
+    hostPath:
+      path: ./state
+      type: Directory
 ---
 kind: Pod
 metadata:
@@ -192,8 +195,9 @@ spec:
   hostNetwork: true
   volumes:
   - name: state
-    persistentVolumeClaim:
-      claimName: state
+    hostPath:
+      path: ./state
+      type: Directory
 ---
 kind: Pod
 metadata:
@@ -241,5 +245,6 @@ spec:
   hostNetwork: true
   volumes:
   - name: state
-    persistentVolumeClaim:
-      claimName: state
+    hostPath:
+      path: ./state
+      type: Directory

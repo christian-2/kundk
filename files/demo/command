@@ -28,26 +28,39 @@ echo "OIDC_PASSKEY_DEMO=$OIDC_PASSKEY_DEMO"
 
 wait_state CERTIFICATES_READY /mnt/state/state.acme
 
-install -m 644 -o 1000 -g 0 \
+install -m 644 \
   /mnt/state/${APACHE_HOSTNAME}_fullchain.cer \
   /usr/local/apache2/conf/server.crt
-install -m 600 -o 1000 -g 0 \
+install -m 600 \
   /mnt/state/$APACHE_HOSTNAME.key \
   /usr/local/apache2/conf/server.key
 
-# disable HTTP
-
 sed -i \
   -e 's/^\(Listen 80\)$/#\1/' \
-  /usr/local/apache2/conf/httpd.conf
-
-# enable HTTPS
-
-sed -i \
   -e 's/^#\(Include .*httpd-ssl.conf\)/\1/' \
   -e 's/^#\(LoadModule .*mod_ssl.so\)/\1/' \
   -e 's/^#\(LoadModule .*mod_socache_shmcb.so\)/\1/' \
   /usr/local/apache2/conf/httpd.conf
+
+sed -i \
+  -e 's/^#\(ServerName\) .*$/\1 '$APACHE_HOSTNAME'/' \
+  -e 's/^\(ServerAdmin\) .*$/\1 '$APACHE_EMAIL'/' \
+  /usr/local/apache2/conf/httpd.conf
+
+if [ -z "$OIDC_PASSKEY_DEMO" ]; then
+  apache_port=9443
+else
+  apache_port=$((9443 + $OIDC_PASSKEY_DEMO))
+fi
+
+sed -i \
+  -e 's/^\(Listen\) 443/\1 '$apache_port'/' \
+  -e 's/^<\(VirtualHost\) _default_:443>$/<\1 _default_:'$apache_port'>/' \
+  -e 's/^\(ServerName\) .*$/\1 '$APACHE_HOSTNAME'/' \
+  -e 's/^\(ServerAdmin\) .*$/\1 '$APACHE_EMAIL'/' \
+  /usr/local/apache2/conf/extra/httpd-ssl.conf
+
+rm /usr/local/apache2/htdocs/index.html
 
 if [ -z "$OIDC_PASSKEY_DEMO" ]; then
 
@@ -57,8 +70,6 @@ if [ -z "$OIDC_PASSKEY_DEMO" ]; then
   wait_state DEMO_READY /mnt/state/state.demo-2
 	
   # provide content for landing page
-
-  rm /usr/local/apache2/htdocs/index.html
 
   install -o www-data -g www-data -m 744 /dev/stdin \
     /usr/local/apache2/htdocs/index.html << EOF
@@ -147,16 +158,6 @@ else
 
   wait_state KEYCLOAK_READY /mnt/state/state.keycloak
 
-  # adjust port
-
-  apache_port=$((9443 + $OIDC_PASSKEY_DEMO))
-  sed -i \
-    -e 's/^\(Listen\) 443/\1 '$apache_port'/' \
-    -e 's/^<\(VirtualHost\) _default_:443>$/<\1 _default_:'$apache_port'>/' \
-    -e 's/^\(ServerName\) .*$/\1 '$APACHE_HOSTNAME':'$apache_port'/' \
-    -e 's/^\(ServerAdmin\) .*$/\1 '$APACHE_EMAIL'/' \
-    /usr/local/apache2/conf/extra/httpd-ssl.conf
-
   # enable CGI
 
   sed -i \
@@ -190,8 +191,6 @@ else
     /usr/local/apache2/conf/httpd.conf
 
   # provide configuration and content for specific demo
-
-  rm /usr/local/apache2/htdocs/index.html
 
   realm=oidc-passkey-demo-$OIDC_PASSKEY_DEMO
 

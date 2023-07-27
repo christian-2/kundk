@@ -13,31 +13,30 @@ So what aspects are different with this one:
   (Keycloak, PostgreSQL, acme.sh, five Apaches for demos)
 * under Apache License (like Keycloak)
 
-## Requirements
-
-* e.g. Debian 12.1
-* e.g. Podman 4.3.1
-
 ## Installation
 
+* tested with Debian 12.1, Podman 4.3.1
+
 ```
-./bin/build --no-cache
+apt-get install xinted 
+cat docs/xinted.conf >> /etc/xinetd.d/services # 1.
+systemctl reload xinetd.service
+./bin/build-images --no-cache
 mkdir k8s
 cp docs/{base,demo}.yaml k8s
-editor k8s/{base,demo}.yaml # 1.
-echo '{"password":"HIDDEN"}' | \
-  podman secret create --driver file keycloak-admin-password - # 2.
-echo '{"password":"HIDDEN"}' | \
-  podman secret create --driver file postgres-keycloak-password - # 2.
-echo '{"password":"HIDDEN"}' | \
-  podman secret create --driver file postgres-password - # 2.
-./bin/reset
-./bin/start
+editor k8s/{base,demo}.yaml # 2.
+./bin/create-secrets #3
+./bin/reset-volumes
+./bin/start-pods
+podman pod ps
 ```
 
-1. see sections Configuration for base, Configuration for demo
-2. e.g. Podman 4.3.1 requires workaround for issue [#16269](https://github.com/containers/podman/issues/16269);
-   see section Secrets for base
+1. The renference deployment uses Podman as container runtime and
+   `podman kube play` as orchestrator. Containers run in a rootless environment,
+   hence ports 80 and 443 have to be redirected to unprivileged ports.
+2. see sections *Configuration for base*, *Configuration for demo*
+3. Podman 4.3.1 requires workaround for issue [#16269](https://github.com/containers/podman/issues/16269);
+   see section *Secrets for base*
 
 ### Configuration for base
 

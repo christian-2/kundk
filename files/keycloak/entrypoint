@@ -32,10 +32,10 @@ fi
 
 wait_state CERTIFICATES_READY /mnt/state/state.acme
 
-install -m 644 -o 1000 -g 0 \
+install -m 644 \
   /mnt/state/${KEYCLOAK_HOSTNAME}_fullchain.cer \
   /opt/keycloak/conf/server.crt.pem
-install -m 600 -o 1000 -g 0 \
+install -m 600 \
   /mnt/state/$KEYCLOAK_HOSTNAME.key \
   /opt/keycloak/conf/server.key.pem
 
@@ -220,9 +220,6 @@ for demo in 1 2 3 4; do
   kcadm.sh create realms --config $config \
     -s realm=$realm \
     -s 'displayName="demo #'$demo'"' \
-    -s resetPasswordAllowed=true \
-    -s registrationAllowed=true \
-    -s verifyEmail=true \
     -s enabled=true
 
   case $demo in

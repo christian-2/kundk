@@ -46,8 +46,9 @@ spec:
     persistentVolumeClaim:
       claimName: acme
   - name: state
-    persistentVolumeClaim:
-      claimName: state
+    hostPath:
+      path: ./state
+      type: Directory
 ---
 apiVersion: apps/v1
 kind: Pod
@@ -79,8 +80,9 @@ spec:
     persistentVolumeClaim:
       claimName: data
   - name: state
-    persistentVolumeClaim:
-      claimName: state
+    hostPath:
+      path: ./state
+      type: Directory
 ---
 apiVersion: apps/v1
 kind: Pod

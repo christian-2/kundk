@@ -29,19 +29,19 @@ grep ^DEFAULT_DOMAIN_KEY_LENGTH=ec /usr/local/bin/acme.sh
 
 if [ ! -f /acme.sh/${APACHE_HOSTNAME}_ecc/$APACHE_HOSTNAME.cer ]; then
   acme.sh --debug $debug \
-    --issue -d $APACHE_HOSTNAME --standalone --httpport 8445
+    --issue -d $APACHE_HOSTNAME --standalone --httpport 9080
 else
   acme.sh --debug $debug \
-     --renew -d $APACHE_HOSTNAME --standalone --httpport 8445 || true
+     --renew -d $APACHE_HOSTNAME --standalone --httpport 9080 || true
 fi
 
 if [ $APACHE_HOSTNAME != $KEYCLOAK_HOSTNAME ]; then
   if [ ! -f /acme.sh/${KEYCLOAK_HOSTNAME}_ecc/$KEYCLOAK_HOSTNAME.cer ]; then
     acme.sh --debug $debug \
-       --issue -d $KEYCLOAK_HOSTNAME --standalone --httpport 8445
+       --issue -d $KEYCLOAK_HOSTNAME --standalone --httpport 9080
   else
     acme.sh --debug $debug \
-       --renew -d $KEYCLOAK_HOSTNAME --standalone --httpport 8445 || true
+       --renew -d $KEYCLOAK_HOSTNAME --standalone --httpport 9080 || true
   fi
 fi
 
