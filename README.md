@@ -13,65 +13,6 @@ So what aspects are different with this one:
   (Keycloak, PostgreSQL, acme.sh, five Apaches for demos)
 * under Apache License (like Keycloak)
 
-## Installation
-
-* tested with Debian 12.1, Podman 4.3.1
-
-```
-apt-get install xinted 
-cat docs/xinted.conf >> /etc/xinetd.d/services # 1.
-systemctl reload xinetd.service
-./bin/build-images --no-cache
-mkdir k8s
-cp docs/{base,demo}.yaml k8s
-editor k8s/{base,demo}.yaml # 2.
-./bin/create-secrets #3
-./bin/reset-volumes
-./bin/start-pods
-podman pod ps
-```
-
-1. The renference deployment uses Podman as container runtime and
-   `podman kube play` as orchestrator. Containers run in a rootless environment,
-   hence ports 80 and 443 have to be redirected to unprivileged ports.
-2. see sections *Configuration for base*, *Configuration for demo*
-3. Podman 4.3.1 requires workaround for issue [#16269](https://github.com/containers/podman/issues/16269);
-   see section *Secrets for base*
-
-### Configuration for base
-
-| env | | example |
-| --- | --- | --- |
-| `ACME_EMAIL` | | (email address) |
-| `APACHE_HOSTNAME` | 1. | (FQDN) |
-| `KEYCLOAK_HOSTNAME` | 1. | (FQDN) |
-| [`KEYCLOAK_LOG_LEVEL`](https://www.keycloak.org/server/all-config?q=log-level) | | `info` |
-| `LDAP_URL` | 2. | `ldap://ldap.forumsys.com:389` |
-
-1. optional; default: `$(hostname -f)`
-2. optional
-
-### Secrets for base
-
-| secret |
-| --- |
-| `keycloak-admin-password` |
-| `postgres-keycloak-password` |
-| `postgres-password` |
-
-### Configuration for demo
-
-| env | | example |
-| --- | --- | --- |
-| `APACHE_EMAIL` | | (email address) |
-| `APACHE_HOSTNAME` | | 1. |
-| [`APACHE_LOG_LEVEL`](https://httpd.apache.org/docs/2.4/en/mod/core.html#loglevel) | | `info` |
-| `KEYCLOAK_HOSTNAME` | | 1. |
-| [`KEYCLOAK_OIDC_REMOTE_USER_CLAIM`](https://github.com/OpenIDC/mod_auth_openidc/blob/master/auth_openidc.conf) | | `given_name ^(.+?)(?:\s.+)?$ $1` |
-| [`KEYCLOAK_OIDC_SCOPE`](https://github.com/OpenIDC/mod_auth_openidc/blob/master/auth_openidc.conf) | | `openid profile`
-
-1. optional; default: `$(hostname -f)`
-
 ## Demos
 
 All demos are accessible from a common landing page `https://$APACHE_HOSTNAME`;
@@ -85,6 +26,79 @@ and they allow read-only inspection of Keycloak configurations in specific realm
 | #2 | LDAP + FIDO passkey (2FA) | LDAP | Keycloak (OIDC) | Apache ([`mod_auth_openidc`](https://github.com/OpenIDC/mod_auth_openidc)) |
 | #3 | FIDO passkey (1FA)  | LDAP | Keycloak (SAML 2.0) | Apache ([`mod_shib`](https://shibboleth.atlassian.net/wiki/spaces/SP3/pages/2065335062/Apache)) |
 | #4 | LDAP + FIDO passkey (2FA) | LDAP | Keycloak (SAML 2.0) | Apache ([`mod_shib`](https://shibboleth.atlassian.net/wiki/spaces/SP3/pages/2065335062/Apache)) |
+
+## Installation
+
+* tested with Debian 12.1, Podman 4.3.1
+
+```
+sudo apt-get install xinetd
+sudo sh -c "cat docs/xinetd.conf >> /etc/xinetd.d/services" # 1.
+sudo systemctl reload xinetd.service
+./bin/build-images --no-cache
+mkdir k8s
+cp docs/{base,demo}.yaml k8s
+editor k8s/{base,demo}.yaml # 2.
+./bin/create-secrets #3
+./bin/reset-volumes
+./bin/start-pods
+podman pod ps
+```
+
+1. The renference deployment uses Podman as container runtime and
+   `podman kube play` as orchestrator. Containers run in a rootless environment,
+   hence ports 80 and 443 have to be redirected to unprivileged ports.
+2. adjust `configmap/config-base` (see section *Configuration for base*) and
+   `configmap/config-demo (see section *Configuration for demo*) respectively
+3. Podman 4.3.1 requires workaround for issue [#16269](https://github.com/containers/podman/issues/16269);
+   see section *Secrets for base*
+
+### Base
+
+#### Configuration
+
+| env | | example |
+| --- | --- | --- |
+| `ACME_EMAIL` | | (email address) |
+| `ACME_SERVER` | 1. | `https://acme.zerossl.com/v2/DV90` |
+| `APACHE_HOSTNAME` | 2. | (FQDN) |
+| `KEYCLOAK_HOSTNAME` | 2. | (FQDN) |
+| [`KEYCLOAK_LOG_LEVEL`](https://www.keycloak.org/server/all-config?q=log-level) | | `info` |
+| `LDAP_URL` | 3. | `ldap://ldap.forumsys.com:389` |
+
+1. optional; default is `https://acme.zerossl.com/v2/DV90`
+2. optional; default is `$(hostname -f)`
+3. optional
+
+#### Secrets
+
+| secret | keys |
+| --- | --- |
+| `acme-eab` | `hmac_key`, `kid` |
+| `keycloak-admin-password` | `password` |
+| `postgres-keycloak-password` | `password` |
+| `postgres-password` | `password` |
+
+#### Hooks
+
+| hook |
+| --- |
+| acme.hook |
+
+### Demo
+
+#### Configuration
+
+| env | | example |
+| --- | --- | --- |
+| `APACHE_EMAIL` | | (email address) |
+| `APACHE_HOSTNAME` | | 1. |
+| [`APACHE_LOG_LEVEL`](https://httpd.apache.org/docs/2.4/en/mod/core.html#loglevel) | | `info` |
+| `KEYCLOAK_HOSTNAME` | | 1. |
+| [`KEYCLOAK_OIDC_REMOTE_USER_CLAIM`](https://github.com/OpenIDC/mod_auth_openidc/blob/master/auth_openidc.conf) | | `given_name ^(.+?)(?:\s.+)?$ $1` |
+| [`KEYCLOAK_OIDC_SCOPE`](https://github.com/OpenIDC/mod_auth_openidc/blob/master/auth_openidc.conf) | | `openid profile`
+
+1. optional; default: `$(hostname -f)`
 
 ## Current Limitations
 

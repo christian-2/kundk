@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: config-base
+data:
+  ACME_EMAIL:
+  ACME_SERVER:
+  APACHE_HOSTNAME:
+  KEYCLOAK_HOSTNAME:
+  KEYCLOAK_LOG_LEVEL: info
+  LDAP_URL:

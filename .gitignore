@@ -1,5 +1,7 @@
 *.swp
+/backup/*
+!/backup/README.md
 /blob.jwt
+/config-base.yaml
+/config-demo.yaml
 /state
-k8s/base.yaml
-k8s/demo.yaml

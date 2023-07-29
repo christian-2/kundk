@@ -8,5 +8,5 @@ rm -fr state
 install -m 775 -d state
 podman unshare chown 0:1000 state
 
-podman kube play --replace k8s/base.yaml > /dev/null
-podman kube play --replace k8s/demo.yaml > /dev/null
+podman kube play --configmap config-base.yaml --replace k8s/base.yaml > /dev/null
+podman kube play --configmap config-demo.yaml --replace k8s/demo.yaml > /dev/null

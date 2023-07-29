@@ -1,0 +1,11 @@
+#!/bin/bash
+set -e
+trap 'echo "error: $0:$LINENO"' ERR
+
+cd $(dirname $0)/..
+
+podman exec -i acme-acme ash << EOF
+path=\$(echo \$ACME_SERVER| sed 's|^https://||')
+cd /acme.sh
+tar -cz ca/\$path *_ecc
+EOF
