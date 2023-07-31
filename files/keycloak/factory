@@ -1,0 +1,103 @@
+#!/bin/bash
+set -e
+trap 'echo "error: $0:$LINENO"' ERR
+
+[ $# -eq 2 ]
+[ -n "$APACHE_HOSTNAME" ]
+
+factory_hook() {
+  [ $# -eq 2 ]
+
+  if [ -s /mnt/factory.hook ]; then
+    [ -x /mnt/factory.hook ]
+
+    /mnt/factory.hook $1 $2
+  else
+    exit 1
+  fi
+}
+
+re='^[0-9]+$'
+
+case $1 in
+client_id|display_name|flow|post_logout_redirect_uri|protocol|redirect_uri)
+  app_id=$2
+
+  if [[ $app_id =~ $re ]]; then
+    case $1 in
+    client_id)
+      echo demo-$app_id-client
+      ;;
+    display_name)
+      echo "demo #$app_id"
+      ;;
+    flow)
+      case $app_id in
+      1|3)
+        echo oidc-passkey-1fa
+        ;;
+      2|4)
+        echo oidc-passkey-2fa
+        ;;
+      *)
+        exit 1
+      esac
+      ;;
+    post_logout_redirect_uri)
+      case $app_id in
+      1|2)
+        echo https://$APACHE_HOSTNAME
+        ;;
+      *)
+        exit 1
+      esac
+      ;;
+    protocol)
+      case $app_id in
+      1|2)
+        echo oidc
+        ;;
+      3|4)
+        echo saml
+        ;;
+      *)
+        exit 1
+      esac
+      ;;
+    redirect_uri)
+      case $app_id in
+      1|2)
+        echo "https://$APACHE_HOSTNAME:$((9443 + $app_id))/vanity.html"
+        ;;
+      3|4)
+        echo "https://$APACHE_HOSTNAME:$((9443 + $app_id))/*"
+        ;;
+      *)
+        exit 1
+      esac
+      ;;
+    *)
+      exit 1
+    esac
+  else
+    factory_hook $1 $2
+  fi
+  ;;
+realm)
+  realm_id=$2
+
+  if [[ $realm_id =~ $re ]]; then
+    case $1 in
+    realm)
+      echo oidc-passkey-demo-$realm_id
+      ;;
+    *)
+      exit 1
+    esac
+  else
+    factory_hook $1 $2
+  fi
+  ;;
+*)
+  exit 1
+esac

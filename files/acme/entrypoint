@@ -17,7 +17,7 @@ echo "KEYCLOAK_HOSTNAME=$KEYCLOAK_HOSTNAME"
 
 # handle acme.hook
 
-if [[ -s /mnt/acme.hook ]]; then
+if [ -s /mnt/acme.hook ]; then
   tar -C /acme.sh/ -xzf /mnt/acme.hook
 fi
 

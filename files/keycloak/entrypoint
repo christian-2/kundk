@@ -5,25 +5,32 @@ trap 'echo "error: $0:$LINENO"' ERR
 # check ENVs
 
 echo "APACHE_HOSTNAME=$APACHE_HOSTNAME"
+echo "APP_IDS=$APP_IDS"
 echo "KEYCLOAK_ADMIN_PASSWORD=$(echo $KEYCLOAK_ADMIN_PASSWORD | sed s/./\*/g)"
 echo "KEYCLOAK_HOSTNAME=$KEYCLOAK_HOSTNAME"
 echo "KEYCLOAK_LOG_LEVEL=$KEYCLOAK_LOG_LEVEL"
 echo "LDAP_URL=$LDAP_URL"
 echo "POSTGRES_KEYCLOAK_PASSWORD=$(echo $POSTGRES_KEYCLOAK_PASSWORD | \
   sed s/./\*/g)"
+echo "REALM_IDS=$REALM_IDS"
+echo "SMTP_SERVER=$SMPT_SERVER"
 
 . /usr/local/bin/issue_19321
 
-[[ -n "$APACHE_HOSTNAME" ]] || APACHE_HOSTNAME=$(fqdn_19321)
-[[ -n "$KEYCLOAK_ADMIN_PASSWORD" ]]
-[[ -n "$KEYCLOAK_HOSTNAME" ]] || KEYCLOAK_HOSTNAME=$(fqdn_19321)
-[[ -n "$KEYCLOAK_LOG_LEVEL" ]]
-[[ -n "$POSTGRES_KEYCLOAK_PASSWORD" ]]
+[ -n "$APACHE_HOSTNAME" ] || APACHE_HOSTNAME=$(fqdn_19321)
+[ -n "$APP_IDS" ] || APP_IDS="1 2 3 4"
+[ -n "$KEYCLOAK_ADMIN_PASSWORD" ]
+[ -n "$KEYCLOAK_HOSTNAME" ] || KEYCLOAK_HOSTNAME=$(fqdn_19321)
+[ -n "$KEYCLOAK_LOG_LEVEL" ] || KEYCLOAK_LOG_LEVEL=info
+[ -n "$POSTGRES_KEYCLOAK_PASSWORD" ]
+[ -n "$REALM_IDS" ] || REALM_IDS="1 2 3 4"
+[ -n "$KEYCLOAK_ADMIN_PASSWORD" ]
+[ -n "$SMTP_SERVER" ]
 
 # download blob.jwt, if necessary
 
-if [[ ! -f /mnt/state/blow.jwt ]]; then
-  curl -o /mnt/state/blob.jwt -L https://mds3.fidoalliance.org
+if [ ! -f /mnt/state/blow.jwt ]; then
+  curl -so /mnt/state/blob.jwt -L https://mds3.fidoalliance.org
 fi
 
 # wait for ACME certificate to have arrived
@@ -46,7 +53,7 @@ wait_state DATABASE_READY /mnt/state/state.db \
 
 # prepare Keycloak configuration file
 
-test -f /opt/keycloak/conf/keycloak.conf
+[ -f /opt/keycloak/conf/keycloak.conf ]
 
 sed -i \
   -e 's/^#\(db-password\)=.*$/\1='$POSTGRES_KEYCLOAK_PASSWORD'/' \
@@ -79,18 +86,23 @@ done
 
 # create session
 
-kc_login
+kc-login
 config=/var/run/keycloak/kcadm.config
 
 # define helper functions
 
+factory() {
+  [ $# -eq 2 ]
+  /factory $1 $2
+}
+
 createExecution() {
-  test $# -eq 4
+  [ $# -eq 4 ]
   id=$(kcadm.sh create --config $config -r $1 -i \
     authentication/flows/$2/executions/execution \
     -s provider=$3)
   kcadm.sh get --config $config -r $1 \
-    authentication/flows/$2/executions | \
+    authentication/flows/$2/executions |& \
     jq --arg id $id --arg requirement $4 \
       '.[] | select(.id == $id) | {"id":.id,"requirement":$requirement}' | \
     kcadm.sh update --config $config -r $1 \
@@ -99,7 +111,7 @@ createExecution() {
 }
 
 createFlow() {
-  test $# -eq 2
+  [ $# -eq 2 ]
   kcadm.sh create --config $config -r $1 \
     authentication/flows \
     -s alias=$2 \
@@ -109,13 +121,13 @@ createFlow() {
 }
 
 createSubflow() {
-  test $# -eq 4
+  [ $# -eq 4 ]
   flowId=$(kcadm.sh create --config $config -r $1 -i \
     authentication/flows/$2/executions/flow \
     -s alias=$3 \
     -s type=basic-flow)
   kcadm.sh get --config $config -r $1 \
-    authentication/flows/$2/executions | \
+    authentication/flows/$2/executions |& \
     jq --arg flowId $flowId --arg requirement $4 \
     '.[] | select(.flowId == $flowId) |
       {"id":.id,"requirement":$requirement}' | \
@@ -125,53 +137,53 @@ createSubflow() {
 }
 
 store_client_secrets() {
-  test $# -eq 3
-  demo=$1
+  [ $# -eq 3 ]
+  app_id=$1
   realm=$2
   client_id=$3
 
   echo "storing client secret for client $client_id"
   client_secret=$(kcadm.sh get --config $config -r $realm \
-    clients | \
+    clients |& \
     jq -r --arg clientId $client_id \
       '.[] | select(.clientId == $clientId) | .secret')
-  test -n "$client_secret"
-  echo $client_secret > /mnt/state/demo-$demo-client-secret
+  [ -n "$client_secret" ]
+  echo $client_secret > /mnt/state/demo-$app_id-client-secret
 }
 
 store_saml_idp_metadata() {
-  test $# -eq 3
-  demo=$1
+  [ $# -eq 3 ]
+  app_id=$1
   realm=$2
   client_id=$3
 
-  case $demo in
+  case $app_id in
   1|2)
     ;;
   3|4)
     idp_entity_id=https://$KEYCLOAK_HOSTNAME:8444/realms/$realm
-    echo $idp_entity_id > /mnt/state/demo-$demo-idp-entity-id
+    echo $idp_entity_id > /mnt/state/demo-$app_id-idp-entity-id
     sp_entity_id=$client_id
-    echo $sp_entity_id > /mnt/state/demo-$demo-sp-entity-id
+    echo $sp_entity_id > /mnt/state/demo-$app_id-sp-entity-id
 
     id=$(kcadm.sh get --config $config -r $realm \
-      clients | \
+      clients |& \
       jq -r --arg clientId $client_id \
         '.[] | select(.clientId == $clientId) | .id')
-    test -n "$id"
+    [ -n "$id" ]
 
     attributes=$(mktemp)
-    kcadm.sh get --config $config -r $realm clients/$id | \
+    kcadm.sh get --config $config -r $realm clients/$id |& \
       jq '.attributes' > $attributes
     sp_signing_cert=$(cat $attributes | jq -r '."saml.signing.certificate"')
     sp_signing_key=$(cat $attributes | jq -r '."saml.signing.private.key"')
-    test $sp_signing_cert != null
-    test $sp_signing_key != null
-    write_pem_cert $sp_signing_cert /mnt/state/demo-$demo-sp-signing-cert.pem \
+    [ $sp_signing_cert != null ]
+    [ $sp_signing_key != null ]
+    write_pem_cert $sp_signing_cert /mnt/state/demo-$app_id-sp-signing-cert.pem \
       644
-    write_pem_key $sp_signing_key /mnt/state/demo-$demo-sp-signing-key.pem \
+    write_pem_key $sp_signing_key /mnt/state/demo-$app_id-sp-signing-key.pem \
       644
-    test $(cat $attributes | jq 'has("saml.encrypt")') = false
+    [ $(cat $attributes | jq 'has("saml.encrypt")') = false ]
     rm $attributes
     ;;
   *)
@@ -180,7 +192,7 @@ store_saml_idp_metadata() {
 }
 
 write_pem_cert() {
-  test $# -eq 3
+  [ $# -eq 3 ]
   cert=$1
   filename=$2
   mode=$3
@@ -192,7 +204,7 @@ write_pem_cert() {
 }
 
 write_pem_key() {
-  test $# -eq 3
+  [ $# -eq 3 ]
   key=$1
   filename=$2
   mode=$3
@@ -205,26 +217,63 @@ write_pem_key() {
 
 # create realms, etc., if necessary
 
-for demo in 1 2 3 4; do
-  realm=oidc-passkey-demo-$demo
-  client_id=demo-$demo-client
+app_ids=($APP_IDS)
+realm_ids=($REALM_IDS)
+[ ${#app_ids[@]} -eq ${#realm_ids[@]} ]
+
+for index in "${!app_ids[@]}"; do
+  app_id=${app_ids[$index]}
+  realm_id=${realm_ids[$index]}
+  [ -n "$app_id" ]
+  [ -n "$realm_id" ]
+
+  realm=$(factory realm $realm_id)
+  client_id=$(factory client_id $app_id)
+  [ -n "$realm" ]
+  [ -n "$client_id" ]
 
   if kcadm.sh get realms/$realm --config $config &> /dev/null; then
     echo "realm $realm already exists"
-    store_client_secrets $demo $realm $client_id
-    store_saml_idp_metadata $demo $realm $client_id
+
+    if [[ $app_id =~ ^[0-9]+$ ]]; then
+      store_client_secrets $app_id $realm $client_id
+      store_saml_idp_metadata $app_id $realm $client_id
+    fi
+
     continue
   fi
 
   echo "creating realm $realm"
+  display_name="$(factory display_name $app_id)"
+  [ -n "$display_name" ]
   kcadm.sh create realms --config $config \
     -s realm=$realm \
-    -s 'displayName="demo #'$demo'"' \
+    -s "displayName=$display_name" \
     -s enabled=true
 
-  case $demo in
-  1|3)
-    flow=demo-$demo-webauthn-passwordless
+  # configure email
+
+  kcadm.sh update --config $config realms/$realm \
+    -s 'smtpServer={"auth":false,"from":"'$KEYCLOAK_EMAIL'","host":"'$SMTP_SERVER'"}'
+  id=$(kcadm.sh get --config $config -r master users |& \
+      jq -r '.[] | select(.username == "admin") | .id')
+  [ -n "$id" ]
+  kcadm.sh update --config $config -r master /users/$id \
+    -s email=$KEYCLOAK_EMAIL \
+    -s emailVerified=true
+
+  # allow user self-service, if applicable
+
+  if [ -z "$LDAP_URL" ]; then
+    kcadm.sh update --config $config realms/$realm \
+      -s resetPasswordAllowed=true \
+      -s registrationAllowed=true \
+      -s verifyEmail=true
+  fi
+
+  flow=$(factory flow $app_id)
+  case $flow in
+  oidc-passkey-1fa)
     required_action=webauthn-register-passwordless
 
     subflow_1=$flow-subflow-1
@@ -257,8 +306,7 @@ for demo in 1 2 3 4; do
     echo "creating execution webauthn-authenticator in $subflow_4"
     createExecution $realm $subflow_4 webauthn-authenticator ALTERNATIVE
     ;;
-  2|4)
-    flow=demo-$demo-webauthn
+  oidc-passkey-2fa)
     required_action=webauthn-register
 
     subflow_1=$flow-subflow-1
@@ -279,10 +327,13 @@ for demo in 1 2 3 4; do
     exit 1
   esac
 
-  case $demo in
-  1|2)
-    redirect_uri="https://$APACHE_HOSTNAME:$((9443 + $demo))/vanity.html"
-    post_logout_redirect_uri="https://$APACHE_HOSTNAME"
+  protocol=$(factory protocol $app_id)
+  redirect_uri=$(factory redirect_uri $app_id)
+  [ -n "$redirect_uri" ]
+  case $protocol in
+  oidc)
+    post_logout_redirect_uri=$(factory post_logout_redirect_uri $app_id)
+    [ -n "$post_logout_redirect_uri" ]
 
     echo "creating OIDC client $client_id"
     kcadm.sh create clients --config $config -r $realm \
@@ -295,10 +346,10 @@ for demo in 1 2 3 4; do
       -s standardFlowEnabled=true \
       -s enabled=true
     ;;
-  3|4)
-    redirect_uri="https://$APACHE_HOSTNAME:$((9443 + $demo))/*"
-    saml_assertion_consumer_url_redirect="https://$APACHE_HOSTNAME:$((9443 + $demo))"
-    saml_single_logout_service_url_redirect="https://$APACHE_HOSTNAME:$((9443 + $demo))/Shibboleth.sso/SLO/Redirect"
+  saml)
+    # TODO factory not yet introduced from here
+    saml_assertion_consumer_url_redirect="https://$APACHE_HOSTNAME:$((9443 + $app_id))"
+    saml_single_logout_service_url_redirect="https://$APACHE_HOSTNAME:$((9443 + $app_id))/Shibboleth.sso/SLO/Redirect"
 
     echo "creating SAML client $client_id"
     kcadm.sh create clients --config $config -r $realm \
@@ -310,7 +361,7 @@ for demo in 1 2 3 4; do
 
     echo "creating protocol mapper for givenName"
     id=$(kcadm.sh get --config $config -r $realm \
-      clients | \
+      clients |& \
         jq -r --arg clientId $client_id \
           '.[] | select(.clientId == $clientId) | .id')
     kcadm.sh create clients/$id/protocol-mappers/models \
@@ -329,17 +380,17 @@ for demo in 1 2 3 4; do
     authentication/required-actions/$required_action \
     -s defaultAction=true
 
-  echo "binding flow $flow to client $client_id's browser flow'"
+  echo "binding flow $flow to client $client_id's browser flow"
   flow_id=$(kcadm.sh get --config $config -r $realm \
-    authentication/flows | \
+    authentication/flows |& \
     jq -r --arg flow $flow \
       '.[] | select(.alias == $flow) | .id')
-  test -n "$flow_id"
+  [ -n "$flow_id" ]
   id=$(kcadm.sh get --config $config -r $realm \
-    clients | \
+    clients |& \
     jq -r --arg clientId $client_id \
       '.[] | select(.clientId == $clientId) | .id')
-  test -n "$id"
+  [ -n "$id" ]
   jq --arg flow_id $flow_id -n \
     '{"authenticationFlowBindingOverrides":{"browser":$flow_id}}' | \
     kcadm.sh update --config $config -r $realm \
@@ -367,20 +418,20 @@ for demo in 1 2 3 4; do
       -s 'config.trustEmail=["true"]' \
       -s 'config.enabled=["true"]'
 
-    case $demo in
+    case $app_id in
     1|2)
       ;;
     3|4)
       echo "deleting LDAP mapper of type user-attribute-ldap-mapper"
       id=$(kcadm.sh get --config $config -r $realm components | \
         jq -r '.[] | select(.providerType=="org.keycloak.storage.ldap.mappers.LDAPStorageMapper" and .providerId=="user-attribute-ldap-mapper" and .name=="first name") | .id')
-      test -n "$id"
+      [ -n "$id" ]
       kcadm.sh delete --config $config -r $realm components/$id
 
       echo "creating LDAP mapper of type full-name-ldap-mapper"
-      id=$(kcadm.sh get --config $config -r $realm components | \
+      id=$(kcadm.sh get --config $config -r $realm components |& \
         jq -r '.[] | select(.providerType=="org.keycloak.storage.UserStorageProvider" and .providerId=="ldap" and .name=="LDAP Test Server") | .id')
-      test -n "$id"
+      [ -n "$id" ]
       kcadm.sh create --config $config -r $realm components \
         -s providerType=org.keycloak.storage.ldap.mappers.LDAPStorageMapper \
         -s providerId=full-name-ldap-mapper \
@@ -399,13 +450,15 @@ for demo in 1 2 3 4; do
     --cclientid realm-management \
     --rolename view-realm --rolename view-clients
 
-  store_client_secrets $demo $realm $client_id
-  store_saml_idp_metadata $demo $realm $client_id
+  if [[ $app_id =~ ^[0-9]+$ ]]; then
+    store_client_secrets $app_id $realm $client_id
+    store_saml_idp_metadata $app_id $realm $client_id
+  fi
 done
 
 # clean-up
 
-kc_logout
+kc-logout
 
 # update state
 

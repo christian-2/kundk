@@ -14,10 +14,10 @@ echo "OIDC_PASSKEY_DEMO=$OIDC_PASSKEY_DEMO"
 
 . /usr/local/bin/issue_19321
 
-[[ -n "$APACHE_EMAIL" ]]
-[[ -n "$APACHE_HOSTNAME" ]] || APACHE_HOSTNAME=$(fqdn_19321)
-[[ -n "$APACHE_LOG_LEVEL" ]]
-[[ -n "$KEYCLOAK_HOSTNAME" ]] || KEYCLOAK_HOSTNAME=$(fqdn_19321)
+[ -n "$APACHE_EMAIL" ]
+[ -n "$APACHE_HOSTNAME" ] || APACHE_HOSTNAME=$(fqdn_19321)
+[ -n "$APACHE_LOG_LECEL" ] || APACHE_LOG_LEVEL=info
+[ -n "$KEYCLOAK_HOSTNAME" ] || KEYCLOAK_HOSTNAME=$(fqdn_19321)
 [[ -n "$KEYCLOAK_OIDC_REMOTE_USER_CLAIM" || "$OIDC_PASSKEY_DEMO" =~ ^(3|4)?$ ]]
 [[ -n "$KEYCLOAK_OIDC_SCOPE" || "$OIDC_PASSKEY_DEMO" =~ ^(3|4)?$ ]]
 [[ -z "$OIDC_PASSKEY_DEMO" || "$OIDC_PASSKEY_DEMO" =~  ^[0-9]+$ ]]
@@ -81,7 +81,7 @@ if [ -z "$OIDC_PASSKEY_DEMO" ]; then
 EOF
   for demo in 1 2 3 4; do
 
-    if [[ $demo == 1 || $demo == 3 ]]; then
+    if [ $demo == 1 -o $demo == 3 ]; then
       cat >> /usr/local/apache2/htdocs/index.html << EOF
 <table>
 <tr>
@@ -142,7 +142,7 @@ EOF
 </tr>
 EOF
 
-    if [[ $demo == 2 || $demo == 4 ]]; then
+    if [ $demo == 2 -o $demo == 4 ]; then
       cat >> /usr/local/apache2/htdocs/index.html << EOF
 </table>
 EOF
@@ -211,7 +211,7 @@ DirectoryIndex index.cgi \
     redirect_uri=https://$APACHE_HOSTNAME:$apache_port/vanity.html
 
     client_secret=$(cat /mnt/state/demo-$OIDC_PASSKEY_DEMO-client-secret)
-    test -n "$client_secret"
+    [ -n "$client_secret" ]
 
     cat >> /usr/local/apache2/conf/httpd.conf << EOF
 
@@ -228,7 +228,7 @@ OIDCScope "$KEYCLOAK_OIDC_SCOPE"
 EOF
 
     end_session_endpoint=$(curl $discovery_url | jq -r .end_session_endpoint)
-    test -n "$end_session_endpoint"
+    [ -n "$end_session_endpoint" ]
 
     post_logout_redirect_uri=https://$APACHE_HOSTNAME
 
@@ -293,9 +293,9 @@ EOF
     wait_state KEYCLOAK_READY /mnt/state/state.keycloak
 
     idp_entity_id=$(cat /mnt/state/demo-$OIDC_PASSKEY_DEMO-idp-entity-id)
-    test -n "$idp_entity_id"
+    [ -n "$idp_entity_id" ]
     sp_entity_id=$(cat /mnt/state/demo-$OIDC_PASSKEY_DEMO-sp-entity-id)
-    test -n "$sp_entity_id"
+    [ -n "$sp_entity_id" ]
 
     # patch shibboleth2.xml and provide signing credentials
 
@@ -303,7 +303,7 @@ EOF
 
     major_version=$(apt-cache show libapache2-mod-shib| grep ^Version | \
       sed -E 's/^Version: //' | cut -d\. -f1)
-    test "$major_version" -eq 3
+    [ "$major_version" -eq 3 ]
 
     xmlstarlet ed -L -O -N ns=urn:mace:shibboleth:3.0:native:sp:config \
       -u /ns:SPConfig/ns:ApplicationDefaults/@entityID -v $sp_entity_id \
@@ -358,12 +358,12 @@ EOF
       -i //MetadataProvider -t attr -n url -v https://$KEYCLOAK_HOSTNAME:8444/realms/$realm/protocol/saml/descriptor \
       /etc/shibboleth/shibboleth2.xml
 
-    test $(xmlstarlet sel -N ns=urn:mace:shibboleth:3.0:native:sp:config -t \
+    [ $(xmlstarlet sel -N ns=urn:mace:shibboleth:3.0:native:sp:config -t \
       -m "/ns:SPConfig/ns:ApplicationDefaults/ns:CredentialResolver[@type='File' and @use='signing']" -v '@certificate' \
-      /etc/shibboleth/shibboleth2.xml) = sp-signing-cert.pem
-    test $(xmlstarlet sel -N ns=urn:mace:shibboleth:3.0:native:sp:config -t \
+      /etc/shibboleth/shibboleth2.xml) = sp-signing-cert.pem ]
+    [ $(xmlstarlet sel -N ns=urn:mace:shibboleth:3.0:native:sp:config -t \
       -m "/ns:SPConfig/ns:ApplicationDefaults/ns:CredentialResolver[@type='File' and @use='signing']" -v '@key' \
-      /etc/shibboleth/shibboleth2.xml) = sp-signing-key.pem
+      /etc/shibboleth/shibboleth2.xml) = sp-signing-key.pem ]
     install -o root -g root -m 644 \
       /mnt/state/demo-$OIDC_PASSKEY_DEMO-sp-signing-cert.pem \
       /etc/shibboleth/sp-signing-cert.pem

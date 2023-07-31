@@ -1,6 +1,6 @@
 
 set_state() {
-  test $# -eq 2
+  [ $# -eq 2 ]
   state=$1
   file=$2
 
@@ -11,7 +11,7 @@ set_state() {
 }
 
 wait_state() {
-  test $# -eq 2 -o $# -eq 3
+  [ $# -eq 2 -o $# -eq 3 ]
   state=$1
   file=$2
   command=$3

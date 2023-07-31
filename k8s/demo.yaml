@@ -29,6 +29,7 @@ spec:
     volumeMounts:
     - name: state
       mountPath: /mnt/state
+    restartPolicy: Never
   hostNetwork: true
   volumes:
   - name: state
@@ -79,6 +80,7 @@ spec:
     volumeMounts:
     - name: state
       mountPath: /mnt/state
+    restartPolicy: Never
   hostNetwork: true
   volumes:
   - name: state
@@ -129,6 +131,7 @@ spec:
     volumeMounts:
     - name: state
       mountPath: /mnt/state
+    restartPolicy: Never
   hostNetwork: true
   volumes:
   - name: state
@@ -179,6 +182,7 @@ spec:
     volumeMounts:
     - name: state
       mountPath: /mnt/state
+    restartPolicy: Never
   hostNetwork: true
   volumes:
   - name: state
@@ -229,6 +233,7 @@ spec:
     volumeMounts:
     - name: state
       mountPath: /mnt/state
+    restartPolicy: Never
   hostNetwork: true
   volumes:
   - name: state

@@ -47,6 +47,7 @@ spec:
       readOnly: true
     - name: state
       mountPath: /mnt/state
+    restartPolicy: Never
   hostNetwork: true
   volumes:
   - name: acme
@@ -54,7 +55,7 @@ spec:
       claimName: acme
   - name: acme-hook
     hostPath:
-      path: backup/acme.tar.gz
+      path: hooks/acme.hook
       type: FileOrCreate
   - name: state
     hostPath:
@@ -85,6 +86,7 @@ spec:
       mountPath: /var/lib/postgresql/data
     - name: state
       mountPath: /mnt/state
+    restartPolicy: Never
   hostNetwork: true
   volumes:
   - name: data
@@ -109,11 +111,21 @@ spec:
         configMapKeyRef:
           name: config-base
           key: APACHE_HOSTNAME
+    - name: APP_IDS
+      valueFrom:
+        configMapKeyRef:
+          name: config-base
+          key: APP_IDS
     - name: KEYCLOAK_ADMIN_PASSWORD
       valueFrom:
         secretKeyRef:
           name: keycloak-admin-password
           key: password
+    - name: KEYCLOAK_EMAIL
+      valueFrom:
+        configMapKeyRef:
+          name: config-base
+          key: KEYCLOAK_EMAIL
     - name: KEYCLOAK_HOSTNAME
       valueFrom:
         configMapKeyRef:
@@ -134,11 +146,29 @@ spec:
         secretKeyRef:
           name: postgres-keycloak-password
           key: password
+    - name: REALM_IDS
+      valueFrom:
+        configMapKeyRef:
+          name: config-base
+          key: REALM_IDS
+    - name: SMTP_SERVER
+      valueFrom:
+        configMapKeyRef:
+          name: config-base
+          key: SMTP_SERVER
     volumeMounts:
+    - name: factory-hook
+      mountPath: /mnt/factory.hook
+      readOnly: true
     - name: state
       mountPath: /mnt/state
+    restartPolicy: Never
   hostNetwork: true
   volumes:
+  - name: factory-hook
+    hostPath:
+      path: hooks/factory.hook
+      type: FileOrCreate
   - name: state
     hostPath:
       path: ./state
