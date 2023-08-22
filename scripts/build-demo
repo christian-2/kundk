@@ -1,0 +1,9 @@
+#!/bin/bash
+set -e
+trap 'echo "error: $0:$LINENO"' ERR
+
+cd $(dirname $0)/..
+
+for image in demo ldap; do
+  podman build -f Dockerfile.$image -t $image $@ .
+done

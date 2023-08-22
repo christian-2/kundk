@@ -10,7 +10,9 @@ echo "APACHE_LOG_LEVEL=$APACHE_LOG_LEVEL"
 echo "KEYCLOAK_HOSTNAME=$KEYCLOAK_HOSTNAME"
 echo "KEYCLOAK_OIDC_REMOTE_USER_CLAIM=$KEYCLOAK_OIDC_REMOTE_USER_CLAIM"
 echo "KEYCLOAK_OIDC_SCOPE=$KEYCLOAK_OIDC_SCOPE"
+echo "KEYCLOAK_PORT"
 echo "OIDC_PASSKEY_DEMO=$OIDC_PASSKEY_DEMO"
+echo "VSPHERE_SERVER=$VSPHERE_SERVER"
 
 . /usr/local/bin/issue_19321
 
@@ -21,6 +23,7 @@ echo "OIDC_PASSKEY_DEMO=$OIDC_PASSKEY_DEMO"
 [[ -n "$KEYCLOAK_OIDC_REMOTE_USER_CLAIM" || "$OIDC_PASSKEY_DEMO" =~ ^(3|4)?$ ]]
 [[ -n "$KEYCLOAK_OIDC_SCOPE" || "$OIDC_PASSKEY_DEMO" =~ ^(3|4)?$ ]]
 [[ -z "$OIDC_PASSKEY_DEMO" || "$OIDC_PASSKEY_DEMO" =~  ^[0-9]+$ ]]
+[ -n "$KEYCLOAK_PORT" ] || KEYCLOAK_PORT=8444
 
 # wait for ACME certificate to have arrived
 
@@ -79,74 +82,93 @@ if [ -z "$OIDC_PASSKEY_DEMO" ]; then
 </head>
 <body>
 EOF
-  for demo in 1 2 3 4; do
-
-    if [ $demo == 1 -o $demo == 3 ]; then
-      cat >> /usr/local/apache2/htdocs/index.html << EOF
-<table>
-<tr>
-<th>demo</th>
-<th>account</th>
-<th>realm admin</th>
-<th>authentication</th>
-<th>registration</th>
-<th>IdP</th>
-<th>SP</th>
-</tr>
-EOF
-    fi
+  for demo in 1 2 3 4 6; do
 
     case $demo in
     1)
-      authentication="FIDO passkey (1FA)"
-      registration=LDAP
-      idp="Keycloak (OIDC)"
-      sp="Apache (mod_auth_openidc)"
+      title="Apache with 1FA (OIDC"
+      authentication="FIDO2 (1FA)"
+      registration="username/password"
+      user_federation="LDAP"
+      op="Keycloak"
+      rp="Apache (mod_auth_openidc)"
       ;;
     2)
-      authentication="LDAP + FIDO passkey (2FA)"
-      registration=LDAP
-      idp="Keycloak (OIDC)"
-      sp="Apache (mod_auth_openidc)"
+      title="Apache with 2FA (OIDC"
+      authentication="username/password + FIDO2 (2FA)"
+      registration="username/password"
+      user_federation="LDAP"
+      op="Keycloak"
+      rp="Apache (mod_auth_openidc)"
       ;;
     3)
-      authentication="FIDO passkey (1FA)"
-      registration=LDAP
-      idp="Keycloak (SAML 2.0)"
-      sp="Apache (mod_shib)"
+      title="Apache with 1FA (SAML"
+      authentication="FIDO2 (1FA)"
+      registration="username/password"
+      user_federation="LDAP"
+      op="Keycloak"
+      rp="Apache (mod_shib)"
       ;;
     4)
-      authentication="LDAP + FIDO passkey (2FA)"
-      registration=LDAP
-      idp="Keycloak (SAML 2.0)"
-      sp="Apache (mod_shib)"
+      title="Apache with 2FA (SAML"
+      authentication="username/password + FIDO2 (2FA)"
+      registration="username/password"
+      user_federation="n/a"
+      op="Keycloak"
+      rp="Apache (mod_shib)"
+      ;;
+    6)
+      title="vSphere with 2FA (OIDC"
+      authentication="username/password + FIDO2 (2FA)"
+      registration="username/password"
+      user_federation="n/a"
+      op="Keycloak"
+      rp="vSphere"
       ;;
     *)
       exit 1
     esac
 
     realm=oidc-passkey-demo-$demo
-    demo_url=https://$APACHE_HOSTNAME:$((9443 + $demo))
-    account_console_url=https://$KEYCLOAK_HOSTNAME:8444/realms/$realm/account
-    realm_admin_console_url=https://$KEYCLOAK_HOSTNAME:8444/admin/$realm/console
+    account_console_url=https://$KEYCLOAK_HOSTNAME:$KEYCLOAK_PORT/realms/$realm/account
+    realm_admin_console_url=https://$KEYCLOAK_HOSTNAME:$KEYCLOAK_PORT/admin/$realm/console
 
     cat >> /usr/local/apache2/htdocs/index.html << EOF
+<h1>$title</h1>
+<table>
 <tr>
-<td><a href="$demo_url">demo #$demo</a></td>
-<td><a href="$account_console_url">console #$demo</td>
-<td><a href="$realm_admin_console_url">console #$demo</td>
-<td>$authentication</td>
-<td>$registration</td>
-<td>$idp</td>
-<td>$sp</td>
-</tr>
+<td>demo</td>
 EOF
-
-    if [ $demo == 2 -o $demo == 4 ]; then
-      cat >> /usr/local/apache2/htdocs/index.html << EOF
+    if [ $demo -ne 6 ]; then
+      demo_url=https://$APACHE_HOSTNAME:$((9443 + $demo))
+      echo '<td><a href="'$demo_url'">demo #'$demo'</a></td>' \
+        >> /usr/local/apache2/htdocs/index.html
+    else
+      if [ -n "$VSPHERE_SERVER" ]; then
+        echo '<td><a href="'$VSPHERE_SERVER'">demo #'$demo'</a></td>' \
+          >> /usr/local/apache2/htdocs/index.html
+      else
+        echo '<td>demo #'$demo'</a></td>' \
+          >> /usr/local/apache2/htdocs/index.html
+      fi
+    fi
+    cat >> /usr/local/apache2/htdocs/index.html << EOF
+</tr>
+<tr>
+<td>Keycloak account console</td>
+<td><a href="$account_console_url">demo #$demo</td>
+</tr>
+<tr>
+<td>Keycloak realm admin console</td>
+<td><a href="$realm_admin_console_url">demo #$demo</td>i
+</tr>
+<tr><td>authentication (factors)</td><td>$authentication</td></tr>
+<tr><td>registration</td><td>$registration</td></tr>
+<tr><td>user federation</td><td>$user_federation</td></tr>
+<tr><td>OP (IdP)</td><td>$op</td></tr>
+<tr><td>RP (SP)</td><td>$rp</td></tr>
 </table>
 EOF
-    fi
   done
   cat >> /usr/local/apache2/htdocs/index.html << EOF
 </body>
@@ -207,7 +229,7 @@ DirectoryIndex index.cgi \
 </Directory>' \
       /usr/local/apache2/conf/httpd.conf
 
-    discovery_url=https://$KEYCLOAK_HOSTNAME:8444/realms/$realm/.well-known/openid-configuration
+    discovery_url=https://$KEYCLOAK_HOSTNAME:$KEYCLOAK_PORT/realms/$realm/.well-known/openid-configuration
     redirect_uri=https://$APACHE_HOSTNAME:$apache_port/vanity.html
 
     client_secret=$(cat /mnt/state/demo-$OIDC_PASSKEY_DEMO-client-secret)
@@ -355,7 +377,7 @@ EOF
       -s /ns:SPConfig/ns:ApplicationDefaults \
       -t elem -n MetadataProvider \
       -i //MetadataProvider -t attr -n type -v XML \
-      -i //MetadataProvider -t attr -n url -v https://$KEYCLOAK_HOSTNAME:8444/realms/$realm/protocol/saml/descriptor \
+      -i //MetadataProvider -t attr -n url -v https://$KEYCLOAK_HOSTNAME:$KEYCLOAK_PORT/realms/$realm/protocol/saml/descriptor \
       /etc/shibboleth/shibboleth2.xml
 
     [ $(xmlstarlet sel -N ns=urn:mace:shibboleth:3.0:native:sp:config -t \

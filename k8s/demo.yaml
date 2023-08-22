@@ -9,23 +9,28 @@ spec:
     - name: APACHE_EMAIL
       valueFrom:
         configMapKeyRef:
-          name: config-demo
+          name: config
           key: APACHE_EMAIL
     - name: APACHE_HOSTNAME
       valueFrom:
         configMapKeyRef:
-          name: config-demo
+          name: config
           key: APACHE_HOSTNAME
     - name: APACHE_LOG_LEVEL
       valueFrom:
         configMapKeyRef:
-          name: config-demo
+          name: config
           key: APACHE_LOG_LEVEL
     - name: KEYCLOAK_HOSTNAME
       valueFrom:
         configMapKeyRef:
-          name: config-demo
+          name: config
           key: KEYCLOAK_HOSTNAME
+    - name: VSPHERE_SERVER
+      valueFrom:
+        configMapKeyRef:
+          name: config
+          key: VSPHERE_SERVER
     volumeMounts:
     - name: state
       mountPath: /mnt/state
@@ -48,32 +53,32 @@ spec:
     - name: APACHE_EMAIL
       valueFrom:
         configMapKeyRef:
-          name: config-demo
+          name: config
           key: APACHE_EMAIL
     - name: APACHE_HOSTNAME
       valueFrom:
         configMapKeyRef:
-          name: config-demo
+          name: config
           key: APACHE_HOSTNAME
     - name: APACHE_LOG_LEVEL
       valueFrom:
         configMapKeyRef:
-          name: config-demo
+          name: config
           key: APACHE_LOG_LEVEL
     - name: KEYCLOAK_HOSTNAME
       valueFrom:
         configMapKeyRef:
-          name: config-demo
+          name: config
           key: KEYCLOAK_HOSTNAME
     - name: KEYCLOAK_OIDC_REMOTE_USER_CLAIM
       valueFrom:
         configMapKeyRef:
-          name: config-demo
+          name: config
           key: KEYCLOAK_OIDC_REMOTE_USER_CLAIM
     - name: KEYCLOAK_OIDC_SCOPE
       valueFrom:
         configMapKeyRef:
-          name: config-demo
+          name: config
           key: KEYCLOAK_OIDC_SCOPE
     - name: OIDC_PASSKEY_DEMO
       value: 1
@@ -99,32 +104,32 @@ spec:
     - name: APACHE_EMAIL
       valueFrom:
         configMapKeyRef:
-          name: config-demo
+          name: config
           key: APACHE_EMAIL
     - name: APACHE_HOSTNAME
       valueFrom:
         configMapKeyRef:
-          name: config-demo
+          name: config
           key: APACHE_HOSTNAME
     - name: APACHE_LOG_LEVEL
       valueFrom:
         configMapKeyRef:
-          name: config-demo
+          name: config
           key: APACHE_LOG_LEVEL
     - name: KEYCLOAK_HOSTNAME
       valueFrom:
         configMapKeyRef:
-          name: config-demo
+          name: config
           key: KEYCLOAK_HOSTNAME
     - name: KEYCLOAK_OIDC_REMOTE_USER_CLAIM
       valueFrom:
         configMapKeyRef:
-          name: config-demo
+          name: config
           key: KEYCLOAK_OIDC_REMOTE_USER_CLAIM
     - name: KEYCLOAK_OIDC_SCOPE
       valueFrom:
         configMapKeyRef:
-          name: config-demo
+          name: config
           key: KEYCLOAK_OIDC_SCOPE
     - name: OIDC_PASSKEY_DEMO
       value: 2
@@ -150,32 +155,32 @@ spec:
     - name: APACHE_EMAIL
       valueFrom:
         configMapKeyRef:
-          name: config-demo
+          name: config
           key: APACHE_EMAIL
     - name: APACHE_HOSTNAME
       valueFrom:
         configMapKeyRef:
-          name: config-demo
+          name: config
           key: APACHE_HOSTNAME
     - name: APACHE_LOG_LEVEL
       valueFrom:
         configMapKeyRef:
-          name: config-demo
+          name: config
           key: APACHE_LOG_LEVEL
     - name: KEYCLOAK_HOSTNAME
       valueFrom:
         configMapKeyRef:
-          name: config-demo
+          name: config
           key: KEYCLOAK_HOSTNAME
     - name: KEYCLOAK_OIDC_REMOTE_USER_CLAIM
       valueFrom:
         configMapKeyRef:
-          name: config-demo
+          name: config
           key: KEYCLOAK_OIDC_REMOTE_USER_CLAIM
     - name: KEYCLOAK_OIDC_SCOPE
       valueFrom:
         configMapKeyRef:
-          name: config-demo
+          name: config
           key: KEYCLOAK_OIDC_SCOPE
     - name: OIDC_PASSKEY_DEMO
       value: 3
@@ -201,35 +206,71 @@ spec:
     - name: APACHE_EMAIL
       valueFrom:
         configMapKeyRef:
-          name: config-demo
+          name: config
           key: APACHE_EMAIL
     - name: APACHE_HOSTNAME
       valueFrom:
         configMapKeyRef:
-          name: config-demo
+          name: config
           key: APACHE_HOSTNAME
     - name: APACHE_LOG_LEVEL
       valueFrom:
         configMapKeyRef:
-          name: config-demo
+          name: config
           key: APACHE_LOG_LEVEL
     - name: KEYCLOAK_HOSTNAME
       valueFrom:
         configMapKeyRef:
-          name: config-demo
+          name: config
           key: KEYCLOAK_HOSTNAME
     - name: KEYCLOAK_OIDC_REMOTE_USER_CLAIM
       valueFrom:
         configMapKeyRef:
-          name: config-demo
+          name: config
           key: KEYCLOAK_OIDC_REMOTE_USER_CLAIM
     - name: KEYCLOAK_OIDC_SCOPE
       valueFrom:
         configMapKeyRef:
-          name: config-demo
+          name: config
           key: KEYCLOAK_OIDC_SCOPE
     - name: OIDC_PASSKEY_DEMO
       value: 4
+    volumeMounts:
+    - name: state
+      mountPath: /mnt/state
+    restartPolicy: Never
+  hostNetwork: true
+  volumes:
+  - name: state
+    hostPath:
+      path: ./state
+      type: Directory
+---
+apiVersion: apps/v1
+kind: Pod
+metadata:
+  name: ldap-6
+spec:
+  containers:
+  - name: ldap
+    image: ldap
+    env:
+    - name: KEYCLOAK_HOSTNAME
+      valueFrom:
+        configMapKeyRef:
+          name: config
+          key: KEYCLOAK_HOSTNAME
+    - name: KEYCLOAK_REALM
+      value: oidc-passkey-demo-6
+    - name: LDAP_PORT
+      value: 3893
+    - name: OIDC_PASSKEY_DEMO
+      value: 6
+    - name: VSPHERE_DOMAIN
+      valueFrom:
+        configMapKeyRef:
+          name: config
+          key: VSPHERE_DOMAIN
     volumeMounts:
     - name: state
       mountPath: /mnt/state

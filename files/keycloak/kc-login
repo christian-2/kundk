@@ -4,13 +4,14 @@ trap 'echo "error: $0:$LINENO"' ERR
 
 . /usr/local/bin/issue_19321
 
-[ -n "$KEYCLOAK_HOSTNAME" ] || KEYCLOAK_HOSTNAME=$(fqdn_19321)
 [ -n "$KEYCLOAK_ADMIN_PASSWORD" ]
+[ -n "$KEYCLOAK_HOSTNAME" ] || KEYCLOAK_HOSTNAME=$(fqdn_19321)
+[ -n "$KEYCLOAK_PORT" ] || KEYCLOAK_PORT=8444
 
 config=/var/run/keycloak/kcadm.config
 /opt/keycloak/bin/kcadm.sh config credentials \
   --config $config \
-  --server https://$KEYCLOAK_HOSTNAME:8444 \
+  --server https://$KEYCLOAK_HOSTNAME:$KEYCLOAK_PORT \
   --realm master \
   --user admin \
   --password $KEYCLOAK_ADMIN_PASSWORD

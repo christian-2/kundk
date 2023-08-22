@@ -1,0 +1,11 @@
+#!/bin/bash
+set -e
+trap 'echo "error: $0:$LINENO"' ERR
+
+cd $(dirname $0)/..
+
+rm -fr state
+install -m 775 -d state
+podman unshare chown 0:1000 state
+
+podman kube play --configmap config.yaml --replace k8s/base.yaml > /dev/null

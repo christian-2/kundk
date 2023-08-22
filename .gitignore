@@ -1,8 +1,7 @@
 *.swp
 /backup
 /blob.jwt
-/config-base.yaml
-/config-demo.yaml
+/config.yaml
 /hooks/*
 !/hooks/README.md
 /state

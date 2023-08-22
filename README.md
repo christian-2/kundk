@@ -20,60 +20,89 @@ they allow removal of registrations and addition of authenticators in
 specific account consoles;
 and they allow read-only inspection of Keycloak configurations in specific realm admin consoles.
 
-| demo | authentication | registration | IdP | SP |
-| --- | --- | --- | --- | --- |
-| #1 | FIDO passkey (1FA) | LDAP | Keycloak (OIDC) | Apache ([`mod_auth_openidc`](https://github.com/OpenIDC/mod_auth_openidc)) |
-| #2 | LDAP + FIDO passkey (2FA) | LDAP | Keycloak (OIDC) | Apache ([`mod_auth_openidc`](https://github.com/OpenIDC/mod_auth_openidc)) |
-| #3 | FIDO passkey (1FA)  | LDAP | Keycloak (SAML 2.0) | Apache ([`mod_shib`](https://shibboleth.atlassian.net/wiki/spaces/SP3/pages/2065335062/Apache)) |
-| #4 | LDAP + FIDO passkey (2FA) | LDAP | Keycloak (SAML 2.0) | Apache ([`mod_shib`](https://shibboleth.atlassian.net/wiki/spaces/SP3/pages/2065335062/Apache)) |
+| demo | authentication | registration | user federation | protocol | OP | RP |
+| --- | --- | --- | --- | --- | --- | --- |
+| #1 | FIDO2 (1FA) | username/password | LDAP | OIDC | Keycloak | Apache ([`mod_auth_openidc`](https://github.com/OpenIDC/mod_auth_openidc)) |
+| #2 | username/password + FIDO2 (2FA) | username/password | LDAP | OIDC | Keycloak | Apache ([`mod_auth_openidc`](https://github.com/OpenIDC/mod_auth_openidc)) |
+| #3 | FIDO2 (1FA) | username/password | LDAP | SAML | Keycloak | Apache ([`mod_shib`](https://shibboleth.atlassian.net/wiki/spaces/SP3/pages/2065335062/Apache)) |
+| #4 | username/password + FIDO2 (2FA) | username/password | LDAP | SAML | Keycloak | Apache ([`mod_shib`](https://shibboleth.atlassian.net/wiki/spaces/SP3/pages/2065335062/Apache))) |
+| #6 | username/password + FIDO2 (2FA) | username/password | n/a | OIDC | Keycloak | vSphere ([ADFS provider](https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.authentication.doc/GUID-C5E998B2-1148-46DC-990E-A5DB71F93351.html)) |
+
+### vSphere
+
+Configure vCenter Server Identity Provider Federation for ADFS as follows:
+
+| option | value |
+| --- | --- |
+| Base distinguished name for users | `cn=users,dc=$(echo $VSPHERE_DOMAIN | sed 's/\./,dc=/g')` |
+| Base distinguished name for groups | `cn=users,dc=$(echo $VSPHERE_DOMAIN | sed 's/\./,dc=/g')` |
+| Username | `cn=demo-6-client,cn=bind,dc=$(echo $VSPHERE_DOMAIN | sed 's/\./,dc=/g')` |
+| Password | client secret for client `demo-6-client` in realm `oidc-passkey-demo-6` |
+| Primary server URL | `ldap://$KEYCLOAK_HOSTNAME:3893` |
+| Secondary server URL | n/a |
+| Certificates (for LDAPS) | n/a |
+| Identity provider name | `demo-6-client` |
+| Client identifier | `demo-6-client` |
+| Share secret | client secret for client `demo-6-client` in realm `oidc-passkey-demo-6` |
+| OpenID Address | `https://$KEYCLOAK_HOSTNAME:$KEYCLOAK_PORT/realms/oidc-passkey-demo-6/.well-known/openid-configuration` |
+
+(tested with vSphere 8.1)
 
 ## Installation
-
-* tested with Debian 12.1, Podman 4.3.1
 
 ```
 sudo apt-get install xinetd
 sudo sh -c "cat docs/xinetd.conf >> /etc/xinetd.d/services" # 1.
 sudo systemctl reload xinetd.service
-./bin/build-images --no-cache
-cp docs/config-{base,demo}.yaml .
-editor config-base.yaml
-editor config-demo.yaml
-./bin/create-secrets #2
-./bin/reset-volumes
-./bin/start-pods
+./scripts/build-base --no-cache
+./scripts/build-demo --no-cache
+cp docs/config.yaml .
+editor config.yamla #2
+./scripts/create-secrets #3
+./scripts/reset-volumes
+sudo loginctl enable-linger $(whoami)
+./scripts/start-base
+./scripts/start-base
 podman pod ps
 ```
 
-1. The renference deployment uses Podman as container runtime and
+1. The reference deployment uses Podman as container runtime and
    `podman kube play` as orchestrator. Containers run in a rootless environment,
-   hence ports 80 and 443 have to be redirected to unprivileged ports.
-2. Podman 4.3.1 requires workaround for issue
+   hence ports 80 and 443 must be redirected to unprivileged ports.
+2. see below
+3. Podman 4.3.1 requires workaround for issue
    [#16269](https://github.com/containers/podman/issues/16269).
 
-### Base
+(tested with Debian 12.1, Podman 4.3.1)
 
-#### Environment variables
+### Environment variables
 
 | env | | example |
 | --- | --- | --- |
 | `ACME_EMAIL` | | (email address) |
 | `ACME_SERVER` | 1. | `https://acme.zerossl.com/v2/DV90` |
-| `APP_IDS` | | `1 2 3 4` |
+| `APACHE_EMAIL` | | (email address) |
 | `APACHE_HOSTNAME` | 2. | (FQDN) |
+| [`APACHE_LOG_LEVEL`](https://httpd.apache.org/docs/2.4/en/mod/core.html#loglevel) | 3. | `debug` |
+| `APP_IDS` | | `1 2 3 4 6` |
 | `KEYCLOAK_EMAIL` | | (email address) |
 | `KEYCLOAK_HOSTNAME` | 2. | (FQDN) |
 | [`KEYCLOAK_LOG_LEVEL`](https://www.keycloak.org/server/all-config?q=log-level) | 3. | `debug` |
-| `LDAP_URL` | 4. | `ldap://ldap.forumsys.com:389` |
-| `REALM_IDS` | | `1 2 3 4` |
+| [`KEYCLOAK_OIDC_REMOTE_USER_CLAIM`](https://github.com/OpenIDC/mod_auth_openidc/blob/master/auth_openidc.conf) | | `given_name ^(.+?)(?:\s.+)?$ $1` |
+| [`KEYCLOAK_OIDC_SCOPE`](https://github.com/OpenIDC/mod_auth_openidc/blob/master/auth_openidc.conf) | | `openid profile`
+| `KEYCLOAK_PORT` | TODO | TODO |
+| `LDAP_SERVER` | 4. | `ldap://ldap.forumsys.com:389` |
+| `REALM_IDS` | | `1 2 3 4 6` |
 | `SMTP_SERVER` | | |
+| `VSPHERE_DOMAIN` | |
+| `VSPHERE_SERVER` | |
 
 1. optional; default is `https://acme.zerossl.com/v2/DV90`
 2. optional; default is `$(hostname -f)`
 3. optional; default is `info`
 4. optional
 
-#### Secrets
+### Secrets
 
 | secret | keys | |
 | --- | --- | --- |
@@ -86,27 +115,3 @@ podman pod ps
 2. password for user `admin` on Keycloak Administration Console
 3. password for PostgreSQL role `keycloak`
 4. password for PostgreSQL role `postgres`
-
-### Demo
-
-#### Environment variables
-
-| env | | example |
-| --- | --- | --- |
-| `APACHE_EMAIL` | | (email address) |
-| `APACHE_HOSTNAME` | 1. | (FQDN) |
-| [`APACHE_LOG_LEVEL`](https://httpd.apache.org/docs/2.4/en/mod/core.html#loglevel) | 2. | `debug` |
-| `KEYCLOAK_HOSTNAME` | 1. | (FQDN) |
-| [`KEYCLOAK_OIDC_REMOTE_USER_CLAIM`](https://github.com/OpenIDC/mod_auth_openidc/blob/master/auth_openidc.conf) | | `given_name ^(.+?)(?:\s.+)?$ $1` |
-| [`KEYCLOAK_OIDC_SCOPE`](https://github.com/OpenIDC/mod_auth_openidc/blob/master/auth_openidc.conf) | | `openid profile`
-
-1. optional; default is `$(hostname -f)`
-2. optional; default is `info`
-
-## Current Limitations
-
-* [Online LDAP Test Server](https://www.forumsys.com/2022/05/10/online-ldap-test-server/) `ldap.forumsys.com ` currently hardcoded
-* Keycloak administration and account consoles not yet protected by 2FA
-* no YubiKey PINs enforced via WebAuthn policies in any of the demos
-* certificate renewal via ACME not yet fully implemented
-* signature on `blob.jwt` not yet checked and `blow.jwt` not refreshed

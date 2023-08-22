@@ -1,0 +1,7 @@
+#!/bin/bash
+set -e
+trap 'echo "error: $0:$LINENO"' ERR
+
+cd $(dirname $0)/..
+
+podman kube play --down k8s/demo.yaml &> /dev/null || true

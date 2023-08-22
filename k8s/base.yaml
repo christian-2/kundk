@@ -22,23 +22,28 @@ spec:
     - name: ACME_EMAIL
       valueFrom:
         configMapKeyRef:
-          name: config-base
+          name: config
           key: ACME_EMAIL
     - name: ACME_SERVER
       valueFrom:
         configMapKeyRef:
-          name: config-base
+          name: config
           key: ACME_SERVER
     - name: APACHE_HOSTNAME
       valueFrom:
         configMapKeyRef:
-          name: config-base
+          name: config
           key: APACHE_HOSTNAME
     - name: KEYCLOAK_HOSTNAME
       valueFrom:
         configMapKeyRef:
-          name: config-base
+          name: config
           key: KEYCLOAK_HOSTNAME
+    - name: KEYCLOAK_PORT
+      valueFrom:
+        configMapKeyRef:
+          name: config
+          key: KEYCLOAK_PORT
     volumeMounts:
     - name: acme
       mountPath: /acme.sh
@@ -109,12 +114,12 @@ spec:
     - name: APACHE_HOSTNAME
       valueFrom:
         configMapKeyRef:
-          name: config-base
+          name: config
           key: APACHE_HOSTNAME
     - name: APP_IDS
       valueFrom:
         configMapKeyRef:
-          name: config-base
+          name: config
           key: APP_IDS
     - name: KEYCLOAK_ADMIN_PASSWORD
       valueFrom:
@@ -124,23 +129,23 @@ spec:
     - name: KEYCLOAK_EMAIL
       valueFrom:
         configMapKeyRef:
-          name: config-base
+          name: config
           key: KEYCLOAK_EMAIL
     - name: KEYCLOAK_HOSTNAME
       valueFrom:
         configMapKeyRef:
-          name: config-base
+          name: config
           key: KEYCLOAK_HOSTNAME
     - name: KEYCLOAK_LOG_LEVEL
       valueFrom:
         configMapKeyRef:
-          name: config-base
+          name: config
           key: KEYCLOAK_LOG_LEVEL
-    - name: LDAP_URL
+    - name: LDAP_SERVER
       valueFrom:
         configMapKeyRef:
-          name: config-base
-          key: LDAP_URL
+          name: config
+          key: LDAP_SERVER
     - name: POSTGRES_KEYCLOAK_PASSWORD
       valueFrom:
         secretKeyRef:
@@ -149,14 +154,27 @@ spec:
     - name: REALM_IDS
       valueFrom:
         configMapKeyRef:
-          name: config-base
+          name: config
           key: REALM_IDS
     - name: SMTP_SERVER
       valueFrom:
         configMapKeyRef:
-          name: config-base
+          name: config
           key: SMTP_SERVER
+    - name: VSPHERE_DOMAIN
+      valueFrom:
+        configMapKeyRef:
+          name: config
+          key: VSPHERE_DOMAIN
+    - name: VSPHERE_SERVER
+      valueFrom:
+        configMapKeyRef:
+          name: config
+          key: VSPHERE_SERVER
     volumeMounts:
+    - name: clients-hook
+      mountPath: /mnt/clients.hook
+      readOnly: true
     - name: factory-hook
       mountPath: /mnt/factory.hook
       readOnly: true
@@ -165,6 +183,10 @@ spec:
     restartPolicy: Never
   hostNetwork: true
   volumes:
+  - name: clients-hook
+    hostPath:
+      path: hooks/clients.hook
+      type: FileOrCreate
   - name: factory-hook
     hostPath:
       path: hooks/factory.hook

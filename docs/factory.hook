@@ -27,6 +27,12 @@ client_id|display_name|flow|post_logout_redirect_uri|protocol|redirect_uri)
       exit 1
     esac
     ;;
+  ldap_url)
+    case $app_id in
+    *)
+      exit 1
+    esac
+    ;;
   post_logout_redirect_uri)
     case $app_id in
     *)

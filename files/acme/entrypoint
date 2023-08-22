@@ -21,7 +21,7 @@ if [ -s /mnt/acme.hook ]; then
   tar -C /acme.sh/ -xzf /mnt/acme.hook
 fi
 
-# update account with email address
+# register account, if necessary
 
 debug=1
 
@@ -37,7 +37,13 @@ else
   eab=""
 fi
 
-acme.sh --debug $debug $server $eab --register-account -m $ACME_EMAIL
+host=$(echo ${ACME_SERVER#"https://"} | cut -d/ -f1)
+if [ ! -d /acme.sh/ca/$host/v2/OV ]; then
+  acme.sh --debug $debug $server $eab --register-account
+  acme.sh --debug $debug $server --update-account -m $ACME_EMAIL
+fi
+echo "ACME account id: $(cat /acme.sh/ca/$host/v2/OV/account.json | \
+  jq -r .orders | sed -E 's|.*account/(.+)/orders$|\1|')"
 
 # update state
 

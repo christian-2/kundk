@@ -1,0 +1,48 @@
+FROM docker.io/golang:alpine AS builder
+RUN apk add --no-cache gcc git make musl-dev
+WORKDIR /tmp
+RUN git clone https://github.com/glauth/glauth
+WORKDIR /tmp/glauth/v2/pkg/plugins
+RUN git submodule add https://github.com/glauth/glauth-postgres
+WORKDIR /tmp/glauth/v2
+RUN mkdir pkg/plugins/glauth-keycloak
+RUN sed 's/postgres/keycloak/g' \
+  pkg/plugins/glauth-postgres/Makefile \
+  >> pkg/plugins/glauth-keycloak/Makefile
+RUN sed -i 's/^TRIM_FLAGS=.*/TRIM_FLAGS=/' Makefile
+RUN go get github.com/go-resty/resty/v2
+RUN go get github.com/stretchr/testify/assert
+RUN go get golang.org/x/oauth2
+RUN make fast
+COPY \
+  glauth-keycloak/*.go \
+  pkg/plugins/glauth-keycloak/
+RUN \
+  files="$(gofmt -l pkg/plugins/glauth-keycloak)"; \
+  if [ -n "$files" ]; then \
+    for file in $files; do \
+      gofmt $file | diff --unified=0 $file -; \
+    done; \
+    false; \
+  fi
+RUN make plugin_keycloak
+WORKDIR /tmp/glauth/v2/pkg/plugins/glauth-keycloak
+RUN go test .
+
+FROM docker.io/alpine
+RUN install -m 755 -o nobody -g nogroup -d /opt/glauth/bin
+RUN install -m 755 -o nobody -g nogroup -d /opt/glauth/etc
+COPY --from=builder --chown=nobody:nogroup \
+  /tmp/glauth/v2/bin/linuxamd64/glauth \
+  /tmp/glauth/v2/bin/linuxamd64/keycloak.so \
+  /opt/glauth/bin/
+COPY --chown=nobody:nogroup files/issue_19321 /usr/local/bin/
+COPY --chown=nobody:nogroup files/ldap/glauth.cfg /opt/glauth/etc/
+COPY --chown=nobody:nogroup files/state /usr/local/bin/
+COPY --chown=nobody:nobody files/ldap/entrypoint /
+WORKDIR /opt/glauth
+USER nobody:nogroup
+ENV KEYCLOAK_HOSTNAME ""
+ENV KEYCLOAK_REALM ""
+ENV LDAP_PORT ""
+ENTRYPOINT ["/entrypoint"]

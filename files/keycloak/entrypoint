@@ -7,23 +7,29 @@ trap 'echo "error: $0:$LINENO"' ERR
 echo "APACHE_HOSTNAME=$APACHE_HOSTNAME"
 echo "APP_IDS=$APP_IDS"
 echo "KEYCLOAK_ADMIN_PASSWORD=$(echo $KEYCLOAK_ADMIN_PASSWORD | sed s/./\*/g)"
+echo "KEYCLOAK_EMAIL=$KEYCLOAK_EMAIL"
 echo "KEYCLOAK_HOSTNAME=$KEYCLOAK_HOSTNAME"
 echo "KEYCLOAK_LOG_LEVEL=$KEYCLOAK_LOG_LEVEL"
-echo "LDAP_URL=$LDAP_URL"
+echo "KEYCLOAK_PORT=$KEYCLOAK_PORT"
+echo "LDAP_SERVER=$LDAP_SERVER"
 echo "POSTGRES_KEYCLOAK_PASSWORD=$(echo $POSTGRES_KEYCLOAK_PASSWORD | \
   sed s/./\*/g)"
 echo "REALM_IDS=$REALM_IDS"
-echo "SMTP_SERVER=$SMPT_SERVER"
+echo "SMTP_SERVER=$SMTP_SERVER"
+echo "VSPHERE_DOMAIN=$VSPHERE_DOMAIN"
+echo "VSPHERE_SERVER=$VSPHERE_SERVER"
 
 . /usr/local/bin/issue_19321
 
 [ -n "$APACHE_HOSTNAME" ] || APACHE_HOSTNAME=$(fqdn_19321)
-[ -n "$APP_IDS" ] || APP_IDS="1 2 3 4"
+[ -n "$APP_IDS" ] || APP_IDS="1 2 3 4 6"
 [ -n "$KEYCLOAK_ADMIN_PASSWORD" ]
+[ -n "$KEYCLOAK_EMAIL" ]
 [ -n "$KEYCLOAK_HOSTNAME" ] || KEYCLOAK_HOSTNAME=$(fqdn_19321)
 [ -n "$KEYCLOAK_LOG_LEVEL" ] || KEYCLOAK_LOG_LEVEL=info
+[ -n "$KEYCLOAK_PORT" ] || KEYCLOAK_PORT=8444
 [ -n "$POSTGRES_KEYCLOAK_PASSWORD" ]
-[ -n "$REALM_IDS" ] || REALM_IDS="1 2 3 4"
+[ -n "$REALM_IDS" ] || REALM_IDS="1 2 3 4 6"
 [ -n "$KEYCLOAK_ADMIN_PASSWORD" ]
 [ -n "$SMTP_SERVER" ]
 
@@ -63,7 +69,7 @@ sed -i \
   -e 's|^#\(https-certificate-file\)=.*$|\1=/opt/keycloak/conf/server.crt.pem|' \
   -e 's|^#\(https-certificate-key-file\)=.*$|\1=/opt/keycloak/conf/server.key.pem|' \
   -e '$a\\' \
-  -e '$ahttps-port=8444' \
+  -e '$ahttps-port='$KEYCLOAK_PORT \
   -e '$alog-level='$KEYCLOAK_LOG_LEVEL \
   /opt/keycloak/conf/keycloak.conf
 
@@ -76,8 +82,8 @@ KEYCLOAK_ADMIN=admin kc.sh $@ &
 while true; do
   echo "$(date +%H:%M:%S) waiting for Keycloak to start"
 
-  if curl --head -fsS https://$KEYCLOAK_HOSTNAME:8444/health/ready \
-    > /dev/null 2>&1; then
+  if curl --head -fsS \
+    https://$KEYCLOAK_HOSTNAME:$KEYCLOAK_PORT/health/ready &> /dev/null; then
     break
   fi
 
@@ -158,10 +164,10 @@ store_saml_idp_metadata() {
   client_id=$3
 
   case $app_id in
-  1|2)
+  1|2|6)
     ;;
   3|4)
-    idp_entity_id=https://$KEYCLOAK_HOSTNAME:8444/realms/$realm
+    idp_entity_id=https://$KEYCLOAK_HOSTNAME:$KEYCLOAK_PORT/realms/$realm
     echo $idp_entity_id > /mnt/state/demo-$app_id-idp-entity-id
     sp_entity_id=$client_id
     echo $sp_entity_id > /mnt/state/demo-$app_id-sp-entity-id
@@ -187,6 +193,7 @@ store_saml_idp_metadata() {
     rm $attributes
     ;;
   *)
+    echo "unsupported app_id: $app_id"
     exit 1
   esac
 }
@@ -234,12 +241,6 @@ for index in "${!app_ids[@]}"; do
 
   if kcadm.sh get realms/$realm --config $config &> /dev/null; then
     echo "realm $realm already exists"
-
-    if [[ $app_id =~ ^[0-9]+$ ]]; then
-      store_client_secrets $app_id $realm $client_id
-      store_saml_idp_metadata $app_id $realm $client_id
-    fi
-
     continue
   fi
 
@@ -264,7 +265,7 @@ for index in "${!app_ids[@]}"; do
 
   # allow user self-service, if applicable
 
-  if [ -z "$LDAP_URL" ]; then
+  if [ -z "$ldap_url" ]; then
     kcadm.sh update --config $config realms/$realm \
       -s resetPasswordAllowed=true \
       -s registrationAllowed=true \
@@ -324,6 +325,7 @@ for index in "${!app_ids[@]}"; do
     createExecution $realm $subflow_1 webauthn-authenticator REQUIRED
     ;;
   *)
+    echo "unsupported flow: $flow"
     exit 1
   esac
 
@@ -345,9 +347,79 @@ for index in "${!app_ids[@]}"; do
       -s 'attributes={"post.logout.redirect.uris":"'$post_logout_redirect_uri'"}' \
       -s standardFlowEnabled=true \
       -s enabled=true
+
+    vsphere_domain=$(factory vsphere_domain $app_id)
+    if [ -n "$vsphere_domain" ]; then
+      echo "prepare client for vSphere: $client_id"
+
+      id=$(kcadm.sh get --config $config -r $realm clients |& \
+        jq -r --arg clientId $client_id \
+          '.[] | select(.clientId == $clientId) | .id')
+      [ -n "$id" ]
+      kcadm.sh update --config $config -r $realm clients/$id \
+        -s clientId=$client_id \
+        -s standardFlowEnabled=true \
+        -s implicitFlowEnabled=false \
+        -s directAccessGrantsEnabled=false \
+        -s serviceAccountsEnabled=true \
+        -s publicClient=false
+
+      kcadm.sh add-roles --config $config -r $realm \
+        --uusername service-account-$client_id \
+	--cclientid realm-management \
+        --rolename view-users
+
+      for model_id in $(kcadm.sh get --config $config -r $realm \
+        clients/$id/protocol-mappers/models | jq -r '.[] | .id'); do
+        kcadm.sh delete --config $config -r $realm \
+          clients/$id/protocol-mappers/models/$model_id
+      done
+
+      kcadm.sh create --config $config -r $realm \
+        clients/$id/protocol-mappers/add-models -f - << EOF
+[
+  {
+    "name" : "sub",
+    "protocol" : "openid-connect",
+    "protocolMapper" : "oidc-usermodel-property-mapper",
+    "config" : {
+      "claim.name" : "sub",
+      "user.attribute" : "username",
+      "id.token.claim" : "true",
+      "access.token.claim" : "true",
+      "userinfo.token.claim" : "true"
+    }
+  },
+  {
+    "name" : "upn",
+    "protocol" : "openid-connect",
+    "protocolMapper" : "oidc-usermodel-property-with-suffix-mapper",
+    "config" : {
+      "claim.name" : "upn",
+      "user.attribute" : "username",
+      "suffix": "@$vsphere_domain",
+      "id.token.claim" : "true",
+      "access.token.claim" : "true",
+      "userinfo.token.claim" : "true"
+    }
+  },
+  {
+    "name" : "group",
+    "protocol" : "openid-connect",
+    "protocolMapper" : "oidc-group-membership-with-suffix-mapper",
+    "config" : {
+      "claim.name" : "group",
+      "suffix": "@$vsphere_domain",
+      "id.token.claim" : "true",
+      "access.token.claim" : "true",
+      "userinfo.token.claim" : "true"
+    }
+  }
+]
+EOF
+    fi
     ;;
   saml)
-    # TODO factory not yet introduced from here
     saml_assertion_consumer_url_redirect="https://$APACHE_HOSTNAME:$((9443 + $app_id))"
     saml_single_logout_service_url_redirect="https://$APACHE_HOSTNAME:$((9443 + $app_id))/Shibboleth.sso/SLO/Redirect"
 
@@ -372,6 +444,7 @@ for index in "${!app_ids[@]}"; do
       -s 'config={"attribute.nameformat":"urn:oasis:names:tc:SAML:2.0:attrname-format:uri","user.attribute":"firstName","friendly.name":"givenName","attribute.name":"urn:oid:2.5.4.42"}'
     ;;
   *)
+    echo "unsupported protocol: $protocol"
     exit 1
   esac
 
@@ -391,19 +464,18 @@ for index in "${!app_ids[@]}"; do
     jq -r --arg clientId $client_id \
       '.[] | select(.clientId == $clientId) | .id')
   [ -n "$id" ]
-  jq --arg flow_id $flow_id -n \
-    '{"authenticationFlowBindingOverrides":{"browser":$flow_id}}' | \
-    kcadm.sh update --config $config -r $realm \
-      clients/$id -f -
+  kcadm.sh update --config $config -r $realm clients/$id \
+    -s 'authenticationFlowBindingOverrides={"browser":"'$flow_id'"}'
 
-  if [ -n "$LDAP_URL" ]; then
+  ldap_url=$(factory ldap_url $app_id)
+  if [ -n "$ldap_url" ]; then
     echo "creating LDAP user storage provider"
     kcadm.sh create components --config $config -r $realm \
       -s providerType=org.keycloak.storage.UserStorageProvider \
       -s providerId=ldap \
       -s name="LDAP Test Server" \
       -s 'config.vendor=["other"]' \
-      -s 'config.connectionUrl=["'$LDAP_URL'"]' \
+      -s 'config.connectionUrl=["'$ldap_url'"]' \
       -s 'config.startTls=["false"]' \
       -s 'config.authType=["simple"]' \
       -s 'config.bindDn=["cn=read-only-admin,dc=example,dc=com"]' \
@@ -419,7 +491,7 @@ for index in "${!app_ids[@]}"; do
       -s 'config.enabled=["true"]'
 
     case $app_id in
-    1|2)
+    1|2|6)
       ;;
     3|4)
       echo "deleting LDAP mapper of type user-attribute-ldap-mapper"
@@ -440,6 +512,7 @@ for index in "${!app_ids[@]}"; do
         -s 'config={"read.only":["true"],"write.only":["false"],"ldap.full.name.attribute":["cn"]}'
     ;;
     *)
+      echo "unsupported app_id: $app_id"
       exit 1
     esac
   fi
@@ -449,6 +522,70 @@ for index in "${!app_ids[@]}"; do
     --rname default-roles-$realm \
     --cclientid realm-management \
     --rolename view-realm --rolename view-clients
+done
+
+# handle clients.hook
+
+if [ -s "/mnt/clients.hook" ]; then
+  for realm in $(jq -r 'keys | .[]' /mnt/clients.hook); do
+    for client_id in $(jq -r --arg realm $realm -r '.[$realm] | keys | .[]' \
+      /mnt/clients.hook); do
+      protocol=$(jq -r --arg realm $realm --arg client_id $client_id \
+        '.[$realm][$client_id].protocol' /mnt/clients.hook)
+      public_client=$(jq -r --arg realm $realm --arg client_id $client_id \
+        '.[$realm][$client_id].public_client' /mnt/clients.hook)
+      secret=$(jq -r --arg realm $realm --arg client_id $client_id \
+        '.[$realm][$client_id].secret' /mnt/clients.hook)
+      [ "$public_client" = false ]
+      [ -n "$secret" ]
+
+      id=$(kcadm.sh get --config $config -r $realm clients |& \
+        jq -r --arg clientId $client_id \
+          '.[] | select(.clientId == $clientId) | .id')
+      if [ -z "$id" ]; then
+        continue
+      fi
+
+      case "$protocol" in
+      openid-connect)
+        echo "restoring secret for $protocol client $client_id in realm $realm"
+        kcadm.sh update --config $config -r $realm clients/$id \
+          -s "secret=$secret"
+        ;;
+      saml)
+        saml_signing_certificate=$(jq -r \
+          --arg realm $realm --arg clientId $client_id \
+          '.[$realm][$clientId].saml_signing_certificate' /mnt/clients.hook)
+        saml_signing_private_key=$(jq -r \
+          --arg realm $realm --arg clientId $client_id -r \
+          '.[$realm][$clientId].saml_signing_private_key' /mnt/clients.hook)
+        [ -n "$saml_signing_certificate" ]
+        [ -n "$saml_signing_private_key" ]
+
+        echo "restoring secret, saml.signing.certificate, saml.signing.private.key for $protocol client $client_id in realm $realm"
+        kcadm.sh update --config $config -r $realm clients/$id \
+          -s "secret=$secret" \
+          -s 'attributes={"saml.signing.certificate":"'$saml_signing_certificate'","saml.signing.private.key":"'$saml_signing_private_key'"}'
+        ;;
+      *)
+        exit 1
+      esac
+    done
+  done
+fi
+
+# store secrets, etc., into state
+#
+for index in "${!app_ids[@]}"; do
+  app_id=${app_ids[$index]}
+  realm_id=${realm_ids[$index]}
+  [ -n "$app_id" ]
+  [ -n "$realm_id" ]
+
+  realm=$(factory realm $realm_id)
+  client_id=$(factory client_id $app_id)
+  [ -n "$realm" ]
+  [ -n "$client_id" ]
 
   if [[ $app_id =~ ^[0-9]+$ ]]; then
     store_client_secrets $app_id $realm $client_id

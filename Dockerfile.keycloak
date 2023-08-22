@@ -14,9 +14,21 @@ RUN yum install \
   yum clean all
 RUN rm -rf /mnt/rootfs/var/cache/*
 
+FROM docker.io/maven AS provider-builder
+
+WORKDIR /opt/keycloak
+COPY files/keycloak/providers/pom.xml ./
+COPY files/keycloak/providers/src/ ./src/
+RUN mvn package test
+
 FROM quay.io/keycloak/keycloak:${KEYCLOAK_VERSION} AS keycloak-builder
 
 WORKDIR /opt/keycloak
+
+COPY --from=provider-builder \
+  /opt/keycloak/target/oidc-keycloak-provider-0.1.jar \
+  /opt/keycloak/providers/
+
 RUN /opt/keycloak/bin/kc.sh build \
   --db=postgres \
   --health-enabled=true
@@ -42,8 +54,9 @@ ENV APACHE_HOSTNAME ""
 ENV APP_IDS ""
 ENV KEYCLOAK_ADMIN_PASSWORD ""
 ENV KEYCLOAK_HOSTNAME ""
+ENV KEYCLOAK_HOSTNAME ""
 ENV KEYCLOAK_LOG_LEVEL ""
-ENV LDAP_URL ""
+ENV LDAP_SERVER ""
 ENV POSTGRES_KEYCLOAK_PASSWORD ""
 ENV REALM_IDS ""
 ENV SMTP_SERVER ""

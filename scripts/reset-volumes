@@ -7,5 +7,5 @@ cd $(dirname $0)/..
 podman volume rm acme data &> /dev/null || true
 rm -fr state
 
-podman volume create acme &> /dev/null
-podman volume create data &> /dev/null
+podman volume create acme &> /dev/null || true
+podman volume create data &> /dev/null || true
