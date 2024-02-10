@@ -86,7 +86,7 @@ EOF
 
     case $demo in
     1)
-      title="Apache with 1FA (OIDC"
+      title="Apache with 1FA (OIDC)"
       authentication="FIDO2 (1FA)"
       registration="username/password"
       user_federation="LDAP"
@@ -94,7 +94,7 @@ EOF
       rp="Apache (mod_auth_openidc)"
       ;;
     2)
-      title="Apache with 2FA (OIDC"
+      title="Apache with 2FA (OIDC)"
       authentication="username/password + FIDO2 (2FA)"
       registration="username/password"
       user_federation="LDAP"
@@ -102,7 +102,7 @@ EOF
       rp="Apache (mod_auth_openidc)"
       ;;
     3)
-      title="Apache with 1FA (SAML"
+      title="Apache with 1FA (SAML)"
       authentication="FIDO2 (1FA)"
       registration="username/password"
       user_federation="LDAP"
@@ -110,7 +110,7 @@ EOF
       rp="Apache (mod_shib)"
       ;;
     4)
-      title="Apache with 2FA (SAML"
+      title="Apache with 2FA (SAML)"
       authentication="username/password + FIDO2 (2FA)"
       registration="username/password"
       user_federation="n/a"
@@ -118,7 +118,7 @@ EOF
       rp="Apache (mod_shib)"
       ;;
     6)
-      title="vSphere with 2FA (OIDC"
+      title="vSphere with 2FA (OIDC)"
       authentication="username/password + FIDO2 (2FA)"
       registration="username/password"
       user_federation="n/a"

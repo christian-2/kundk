@@ -30,12 +30,13 @@ and they allow read-only inspection of Keycloak configurations in specific realm
 
 ### vSphere
 
-Configure vCenter Server Identity Provider Federation for ADFS as follows:
+Configure vCenter Server Identity Provider Federation for ADFS as follows
+(tested with vSphere 8.1):
 
 | option | value |
 | --- | --- |
-| Base distinguished name for users | `cn=users,dc=$(echo $VSPHERE_DOMAIN | sed 's/\./,dc=/g')` |
-| Base distinguished name for groups | `cn=users,dc=$(echo $VSPHERE_DOMAIN | sed 's/\./,dc=/g')` |
+| Base distinguished name for users | `cn=users,dc=$(echo $VSPHERE_DOMAIN \| sed 's/\./,dc=/g')` |
+| Base distinguished name for groups | `cn=users,dc=$(echo $VSPHERE_DOMAIN \| sed 's/\./,dc=/g')` |
 | Username | `cn=demo-6-client,cn=bind,dc=$(echo $VSPHERE_DOMAIN | sed 's/\./,dc=/g')` |
 | Password | client secret for client `demo-6-client` in realm `oidc-passkey-demo-6` |
 | Primary server URL | `ldap://$KEYCLOAK_HOSTNAME:3893` |
@@ -45,8 +46,6 @@ Configure vCenter Server Identity Provider Federation for ADFS as follows:
 | Client identifier | `demo-6-client` |
 | Share secret | client secret for client `demo-6-client` in realm `oidc-passkey-demo-6` |
 | OpenID Address | `https://$KEYCLOAK_HOSTNAME:$KEYCLOAK_PORT/realms/oidc-passkey-demo-6/.well-known/openid-configuration` |
-
-(tested with vSphere 8.1)
 
 ## Installation
 
