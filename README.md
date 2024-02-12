@@ -56,7 +56,7 @@ sudo systemctl reload xinetd.service
 ./scripts/build-base --no-cache
 ./scripts/build-demo --no-cache
 cp docs/config.yaml .
-editor config.yamla #2
+editor config.yaml #2
 ./scripts/create-secrets #3
 ./scripts/reset-volumes
 sudo loginctl enable-linger $(whoami)
