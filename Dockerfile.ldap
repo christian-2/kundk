@@ -2,17 +2,20 @@ FROM docker.io/golang:alpine AS builder
 RUN apk add --no-cache gcc git make musl-dev
 WORKDIR /tmp
 RUN git clone https://github.com/glauth/glauth
-WORKDIR /tmp/glauth/v2/pkg/plugins
-RUN git submodule add https://github.com/glauth/glauth-postgres
-WORKDIR /tmp/glauth/v2
-RUN mkdir pkg/plugins/glauth-keycloak
+WORKDIR /tmp/glauth
+RUN git submodule set-url v2/pkg/plugins/glauth-postgres \
+  https://github.com/glauth/glauth-postgres
+RUN git submodule update --init v2/pkg/plugins/glauth-postgres
+RUN mkdir v2/pkg/plugins/glauth-keycloak
 RUN sed 's/postgres/keycloak/g' \
-  pkg/plugins/glauth-postgres/Makefile \
-  >> pkg/plugins/glauth-keycloak/Makefile
+  v2/pkg/plugins/glauth-postgres/Makefile >> \
+  v2/pkg/plugins/glauth-keycloak/Makefile
+WORKDIR /tmp/glauth/v2/pkg/plugins/glauth-keycloak
 RUN sed -i 's/^TRIM_FLAGS=.*/TRIM_FLAGS=/' Makefile
 RUN go get github.com/go-resty/resty/v2
 RUN go get github.com/stretchr/testify/assert
 RUN go get golang.org/x/oauth2
+WORKDIR /tmp/glauth/v2
 RUN make fast
 COPY \
   glauth-keycloak/*.go \
