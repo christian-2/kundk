@@ -1,9 +1,9 @@
-# oidc-passkey
+# kundk
 
 There are lots of [FIDO2](https://fidoalliance.org/fido2)/[WebAuthn](https://www.w3.org/TR/webauthn-2) demos out there.
 So what aspects are different with this one:
 
-* allows FIDO passkey as 1st (for 1FA) or 2nd (for 2FA) factor
+* allows FIDO passkeys as 1st (for 1FA) or 2nd (for 2FA) factor
   during authentication
 * employs LDAP during registration and as 1st (for 2FA) factor
   during authentication
@@ -38,14 +38,14 @@ Configure vCenter Server Identity Provider Federation for ADFS as follows
 | Base distinguished name for users | `cn=users,dc=$(echo $VSPHERE_DOMAIN \| sed 's/\./,dc=/g')` |
 | Base distinguished name for groups | `cn=users,dc=$(echo $VSPHERE_DOMAIN \| sed 's/\./,dc=/g')` |
 | Username | `cn=demo-6-client,cn=bind,dc=$(echo $VSPHERE_DOMAIN | sed 's/\./,dc=/g')` |
-| Password | client secret for client `demo-6-client` in realm `oidc-passkey-demo-6` |
+| Password | client secret for client `demo-6-client` in realm `kundk-demo-6` |
 | Primary server URL | `ldap://$KEYCLOAK_HOSTNAME:3893` |
 | Secondary server URL | n/a |
 | Certificates (for LDAPS) | n/a |
 | Identity provider name | `demo-6-client` |
 | Client identifier | `demo-6-client` |
-| Share secret | client secret for client `demo-6-client` in realm `oidc-passkey-demo-6` |
-| OpenID Address | `https://$KEYCLOAK_HOSTNAME:$KEYCLOAK_PORT/realms/oidc-passkey-demo-6/.well-known/openid-configuration` |
+| Share secret | client secret for client `demo-6-client` in realm `kundk-demo-6` |
+| OpenID Address | `https://$KEYCLOAK_HOSTNAME:$KEYCLOAK_PORT/realms/kundk-demo-6/.well-known/openid-configuration` |
 
 ## Installation
 

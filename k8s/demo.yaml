@@ -261,7 +261,7 @@ spec:
           name: config
           key: KEYCLOAK_HOSTNAME
     - name: KEYCLOAK_REALM
-      value: oidc-passkey-demo-6
+      value: kundk-demo-6
     - name: LDAP_PORT
       value: 3893
     - name: OIDC_PASSKEY_DEMO

@@ -61,7 +61,7 @@ client=$(mktemp)
 printf "# WebAuthn sessions\n"
 
 for demo in 1 2 3 4; do
-  realm=oidc-passkey-demo-$demo
+  realm=kundk-demo-$demo
   kcadm.sh get --config $config -r $realm \
     users 2> /dev/null | jq 'sort_by(.username)' > $users
 

@@ -129,7 +129,7 @@ EOF
       exit 1
     esac
 
-    realm=oidc-passkey-demo-$demo
+    realm=kundk-demo-$demo
     account_console_url=https://$KEYCLOAK_HOSTNAME:$KEYCLOAK_PORT/realms/$realm/account
     realm_admin_console_url=https://$KEYCLOAK_HOSTNAME:$KEYCLOAK_PORT/admin/$realm/console
 
@@ -214,7 +214,7 @@ else
 
   # provide configuration and content for specific demo
 
-  realm=oidc-passkey-demo-$OIDC_PASSKEY_DEMO
+  realm=kundk-demo-$OIDC_PASSKEY_DEMO
 
   case $OIDC_PASSKEY_DEMO in
   1|2)

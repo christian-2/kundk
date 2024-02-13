@@ -274,7 +274,7 @@ for index in "${!app_ids[@]}"; do
 
   flow=$(factory flow $app_id)
   case $flow in
-  oidc-passkey-1fa)
+  kundk-1fa)
     required_action=webauthn-register-passwordless
 
     subflow_1=$flow-subflow-1
@@ -307,7 +307,7 @@ for index in "${!app_ids[@]}"; do
     echo "creating execution webauthn-authenticator in $subflow_4"
     createExecution $realm $subflow_4 webauthn-authenticator ALTERNATIVE
     ;;
-  oidc-passkey-2fa)
+  kundk-2fa)
     required_action=webauthn-register
 
     subflow_1=$flow-subflow-1
