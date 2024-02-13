@@ -160,7 +160,7 @@ EOF
 </tr>
 <tr>
 <td>Keycloak realm admin console</td>
-<td><a href="$realm_admin_console_url">demo #$demo</td>i
+<td><a href="$realm_admin_console_url">demo #$demo</td>
 </tr>
 <tr><td>authentication (factors)</td><td>$authentication</td></tr>
 <tr><td>registration</td><td>$registration</td></tr>
