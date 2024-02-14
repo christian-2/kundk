@@ -18,7 +18,14 @@ So what aspects are different with this one:
 All demos are accessible from a common landing page `https://$APACHE_HOSTNAME`;
 they allow removal of registrations and addition of authenticators in
 specific account consoles;
-and they allow read-only inspection of Keycloak configurations in specific realm admin consoles.
+and they allow read-only inspection of Keycloak configurations in specific realm admin
+consoles.
+
+| relying party (RP) | 1FA | 2FA |
+| --- | :---: | :---: |
+| Apache `mod_auth_openidc` | ✅ | ✅ |
+| Apache `mod_shib` | ✅ | ✅ |
+| VMware vSphere | n/a | ✅ |
 
 | demo | authentication | registration | user federation | protocol | OP | RP |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -28,7 +35,7 @@ and they allow read-only inspection of Keycloak configurations in specific realm
 | #4 | username/password + FIDO2 (2FA) | username/password | LDAP | SAML | Keycloak | Apache ([`mod_shib`](https://shibboleth.atlassian.net/wiki/spaces/SP3/pages/2065335062/Apache))) |
 | #6 | username/password + FIDO2 (2FA) | username/password | n/a | OIDC | Keycloak | vSphere ([ADFS provider](https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.authentication.doc/GUID-C5E998B2-1148-46DC-990E-A5DB71F93351.html)) |
 
-### vSphere
+### VMware vSphere
 
 Configure vCenter Server Identity Provider Federation for ADFS as follows
 (tested with vSphere 8.1):
@@ -114,3 +121,7 @@ podman pod ps
 2. password for user `admin` on Keycloak Administration Console
 3. password for PostgreSQL role `keycloak`
 4. password for PostgreSQL role `postgres`
+
+## Frequently asked questions
+
+* [FAQ](FAQ.md)
