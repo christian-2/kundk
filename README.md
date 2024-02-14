@@ -39,7 +39,7 @@ Configure vCenter Server Identity Provider Federation for ADFS as follows
 | Base distinguished name for groups | `cn=users,dc=$(echo $VSPHERE_DOMAIN \| sed 's/\./,dc=/g')` |
 | Username | `cn=demo-6-client,cn=bind,dc=$(echo $VSPHERE_DOMAIN | sed 's/\./,dc=/g')` |
 | Password | client secret for client `demo-6-client` in realm `kundk-demo-6` |
-| Primary server URL | `ldap://$KEYCLOAK_HOSTNAME:3893` |
+| Primary server URL | `ldaps://$KEYCLOAK_HOSTNAME:3893` |
 | Secondary server URL | n/a |
 | Certificates (for LDAPS) | n/a |
 | Identity provider name | `demo-6-client` |

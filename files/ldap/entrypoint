@@ -21,5 +21,7 @@ wait_state KEYCLOAK_READY /mnt/state/state.keycloak
 # start GLAuth and its Keycloak plugin
 
 /opt/glauth/bin/glauth \
-  --ldap 0.0.0.0:$LDAP_PORT \
+  --ldaps $KEYCLOAK_HOSTNAME:$LDAP_PORT \
+  --ldaps-cert /mnt/state/$KEYCLOAK_HOSTNAME.cer \
+  --ldaps-key /mnt/state/$KEYCLOAK_HOSTNAME.key \
   --config /opt/glauth/etc/glauth.cfg
