@@ -2,17 +2,15 @@
 set -e
 trap 'echo "error: $0:$LINENO"' ERR
 
-echo "POSTGRES_KEYCLOAK_PASSWORD=$(echo $POSTGRES_KEYCLOAK_PASSWORD | \
-  sed s/./\*/g)"
+echo "KEYCLOAK_DB_PASSWORD=$(echo $KEYCLOAK_DB_PASSWORD | sed s/./\*/g)"
 echo "POSTGRES_PASSWORD=$(echo $POSTGRES_PASSWORD | sed s/./\*/g)"
 
-[ -n "$POSTGRES_KEYCLOAK_PASSWORD" ]
+[ -n "$KEYCLOAK_DB_PASSWORD" ]
 [ -n "$POSTGRES_PASSWORD" ]
 
 # create USER, DATABASE
 
 psql -U postgres << EOF
-CREATE USER keycloak WITH PASSWORD '$POSTGRES_KEYCLOAK_PASSWORD';
 CREATE DATABASE keycloak OWNER keycloak;
 EOF
 

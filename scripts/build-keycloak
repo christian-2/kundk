@@ -4,4 +4,4 @@ trap 'echo "error: $0:$LINENO"' ERR
 
 cd $(dirname $0)/..
 
-podman kube play --down k8s/base.yaml &> /dev/null || true
+podman build -f Dockerfile.keycloak -t keycloak $@ .

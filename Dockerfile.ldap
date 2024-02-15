@@ -45,7 +45,8 @@ COPY --chown=nobody:nogroup files/state /usr/local/bin/
 COPY --chown=nobody:nobody files/ldap/entrypoint /
 WORKDIR /opt/glauth
 USER nobody:nogroup
-ENV KEYCLOAK_HOSTNAME ""
+ENV KEYCLOAK_PORT ""
 ENV KEYCLOAK_REALM ""
 ENV LDAP_PORT ""
+ENV VSPHERE_DOMAIN ""
 ENTRYPOINT ["/entrypoint"]

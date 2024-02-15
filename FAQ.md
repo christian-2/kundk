@@ -13,3 +13,7 @@ You do not need `glauth-keycloak` and its propriertary piece of Go
 if your LDAP connection is to an AD or ADFS server. It serves cases where the
 connection is e.g. to an OpenLDAP server (or to the
 [Online LDAP Test Server](https://www.forumsys.com/2022/05/10/online-ldap-test-server/)).
+
+## Is WebAuthn Conditional UI supported?
+
+Yes, [WebAuthn Conditional UI](https://github.com/w3c/webauthn/wiki/Explainer:-WebAuthn-Conditional-UI) is supported (provided the browser supports it too.)

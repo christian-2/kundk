@@ -1,0 +1,17 @@
+[Install]
+WantedBy=default.target
+
+[Container]
+
+Image=localhost/keycloak:latest
+Volume=/opt/kundk/clients-hook:/mnt/clients-hook
+Volume=/opt/kundk/factory-hooks:/mnt/factory-hooks:ro
+Volume=/opt/kundk/state:/mnt/state
+Network=host
+
+EnvironmentFile=/opt/kundk/keycloak.env
+EnvironmentFile=/opt/kundk/demo.env
+
+Secret=keycloak-admin-password,type=env,target=KEYCLOAK_ADMIN_PASSWORD
+Secret=keycloak-db-password,type=env,target=KEYCLOAK_DB_PASSWORD
+Secret=postgres-password,type=env,target=POSTGRES_PASSWORD

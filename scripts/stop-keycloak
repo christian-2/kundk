@@ -4,6 +4,4 @@ trap 'echo "error: $0:$LINENO"' ERR
 
 [ $EUID -eq 0 ]
 
-for d in demo-{1,2,3,4,6} demo ldap; do
-	systemctl start $d.service
-done
+systemctl stop keycloak.service

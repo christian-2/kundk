@@ -1,0 +1,10 @@
+[Install]
+WantedBy=default.target
+
+[Container]
+
+Image=localhost/ldap:latest
+Volume=/opt/kundk/state:/mnt/state
+Network=host
+
+EnvironmentFile=/opt/kundk/demo.env

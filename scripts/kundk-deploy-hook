@@ -1,0 +1,19 @@
+#!/bin/bash
+set -e
+trap 'echo "error: $0:$LINENO"' ERR
+
+[ $EUID -eq 0 ]
+
+[ -d /etc/letsencrypt/live/$(hostname -f) ]
+fullchain_file="/etc/letsencrypt/live/$(hostname -f)/fullchain.pem"
+privkey_file="/etc/letsencrypt/live/$(hostname -f)/privkey.pem"
+[ -f $fullchain_file ]
+[ -f $privkey_file ]
+
+state=/opt/kundk/state
+install -o debian -g debian -m 700 $fullchain_file \
+  $state/$(hostname -f)_fullchain.cer
+install -o debian -g debian -m 700 $privkey_file \
+  $state/$(hostname -f).key
+install -o debian -g debian -m 700 <(echo CERTIFICATES_READY) \
+  $state/state.acme

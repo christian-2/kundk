@@ -1,16 +1,13 @@
 #!/bin/ash
 
-echo "KEYCLOAK_HOSTNAME=$KEYCLOAK_HOSTNAME"
 echo "KEYCLOAK_REALM=$KEYCLOAK_REALM"
 echo "LDAP_PORT=$LDAP_PORT"
-echo "OIDC_PASSKEY_DEMO=$OIDC_PASSKEY_DEMO"
 
-. /usr/local/bin/issue_19321
-
-[ -n "$KEYCLOAK_HOSTNAME" ] || KEYCLOAK_HOSTNAME=$(fqdn_19321)
 [ -n "$KEYCLOAK_REALM" ]
 [ -n "$LDAP_PORT" ]
-[ -n "OIDC_PASSKEY_DEMO=$OIDC_PASSKEY_DEMO" ];
+
+. /usr/local/bin/issue_19321
+fqdn=$(fqdn_19321)
 
 # wait for Keycloak to be ready
 
@@ -21,7 +18,7 @@ wait_state KEYCLOAK_READY /mnt/state/state.keycloak
 # start GLAuth and its Keycloak plugin
 
 /opt/glauth/bin/glauth \
-  --ldaps $KEYCLOAK_HOSTNAME:$LDAP_PORT \
+  --ldaps $fqdn:$LDAP_PORT \
   --ldaps-cert /mnt/state/$KEYCLOAK_HOSTNAME.cer \
   --ldaps-key /mnt/state/$KEYCLOAK_HOSTNAME.key \
   --config /opt/glauth/etc/glauth.cfg

@@ -1,18 +1,30 @@
-ARG KEYCLOAK_VERSION=23.0.6
+ARG KEYCLOAK_VERSION=latest
 ARG KEYCLOAK_RELEASEVER=9
 FROM registry.access.redhat.com/ubi${KEYCLOAK_RELEASEVER}/ubi AS package-builder
+ARG KEYCLOAK_RELEASEVER=9
 
 RUN mkdir -p /mnt/rootfs
-ARG KEYCLOAK_RELEASEVER
-RUN yum install \
+ARG KEYCLOAK_DB
+RUN case ${KEYCLOAK_DB} in \
+  mariadb) \
+    db= \
+    ;; \
+  postgres) \
+    db=postgresql \
+    ;; \
+  *) \
+    exit 1 \
+    ;; \
+  esac && \
+  yum install \
     --installroot /mnt/rootfs \
     --releasever ${KEYCLOAK_RELEASEVER} \
     --setopt install_weak_deps=false \
     --nodocs -y \
-    curl gzip hostname httpd jq nc openssl postgresql python3 python3-pip \
-      socat tar && \
-  yum clean all
-RUN rm -rf /mnt/rootfs/var/cache/*
+    curl gzip hostname httpd jq nc openssl python3 python3-pip socat tar \
+      $db && \
+  yum clean all && \
+  rm -rf /mnt/rootfs/var/cache/*
 
 FROM docker.io/maven AS provider-builder
 
@@ -29,9 +41,11 @@ COPY --from=provider-builder \
   /opt/keycloak/target/oidc-keycloak-provider-0.1.jar \
   /opt/keycloak/providers/
 
+ARG KEYCLOAK_DB
 RUN /opt/keycloak/bin/kc.sh build \
-  --db=postgres \
-  --health-enabled=true
+    --db ${KEYCLOAK_DB} \
+    --health-enabled=true && \
+  /opt/keycloak/bin/kc.sh show-config
 
 FROM quay.io/keycloak/keycloak:${KEYCLOAK_VERSION}
 
@@ -50,14 +64,12 @@ RUN \
   /var/lib/keycloak/venv/bin/pip3 install \
     --cache-dir /var/lib/keycloak/cache/pip --upgrade pip PyJWT
 
-ENV APACHE_HOSTNAME ""
 ENV APP_IDS ""
 ENV KEYCLOAK_ADMIN_PASSWORD ""
-ENV KEYCLOAK_HOSTNAME ""
-ENV KEYCLOAK_HOSTNAME ""
+ENV KEYCLOAK_DB_PASSWORD ""
+ENV KEYCLOAK_DB_URL ""
+ENV KEYCLOAK_DB_USERNAME ""
 ENV KEYCLOAK_LOG_LEVEL ""
-ENV LDAP_SERVER ""
-ENV POSTGRES_KEYCLOAK_PASSWORD ""
 ENV REALM_IDS ""
 ENV SMTP_SERVER ""
 
@@ -68,8 +80,7 @@ COPY files/issue_19321 /usr/local/bin/
 
 VOLUME /mnt/state
 
-COPY --chmod=755 \
-  files/keycloak/entrypoint files/keycloak/factory /
+COPY --chmod=755 files/keycloak/entrypoint files/keycloak/demos /
 ENTRYPOINT ["/entrypoint"]
 RUN [ -f /opt/keycloak/conf/keycloak.conf ]
 CMD ["start", "--optimized" ]

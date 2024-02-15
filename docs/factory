@@ -1,0 +1,72 @@
+#!/bin/bash
+set -e
+trap 'echo "error: $0:$LINENO"' ERR
+
+[ $# -eq 2 ]
+
+key=$1
+app_id=$2 # $1 is either app_id or realm_id, depending on key
+realm_id=$2
+
+case $key in
+client_id)
+  echo ""
+  ;;
+display_name)
+  echo ""
+  ;;
+flow)
+  echo ""
+  ;;
+ldap_attribute_first_name)
+  echo ""
+  ;;
+ldap_auth_type)
+  echo ""
+  ;;
+ldap_bind_credential)
+  echo ""
+  ;;
+ldap_bind_dn)
+  echo ""
+  ;;
+ldap_connection_url)
+  echo ""
+  ;;
+ldap_rdn_ldap_attribute)
+  echo ""
+  ;;
+ldap_username_ldap_attribute)
+  echo ""
+  ;;
+ldap_users_dn)
+  echo ""
+  ;;
+ldap_user_object_class)
+  echo ""
+  ;;
+ldap_uuid_ldap_attribute)
+  echo ""
+  ;;
+post_logout_redirect_uri)
+  echo ""
+  ;;
+protocol)
+  echo ""
+  ;;
+realm)
+  echo ""
+  ;;
+redirect_uri)
+  echo ""
+  ;;
+saml_assertion_consumer_url_redirect)
+  echo ""
+  ;;
+saml_single_logout_service_url_redirect)
+  echo ""
+  ;;
+vsphere_domain)
+  echo ""
+  ;;
+esac

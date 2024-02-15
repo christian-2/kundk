@@ -15,7 +15,7 @@ ENV KEYCLOAK_HOSTNAME ""
 
 COPY files/issue_19321 /usr/local/bin/
 
-VOLUME /mnt/acme.hook
+VOLUME /mnt/acme-hook
 
 COPY files/acme/entrypoint /
 ENTRYPOINT ["/entrypoint"]

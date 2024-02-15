@@ -15,10 +15,10 @@ echo "KEYCLOAK_HOSTNAME=$KEYCLOAK_HOSTNAME"
 [ -n "$APACHE_HOSTNAME" ] || APACHE_HOSTNAME=$(fqdn_19321)
 [ -n "$KEYCLOAK_HOSTNAME" ] || KEYCLOAK_HOSTNAME=$(fqdn_19321)
 
-# handle acme.hook
+# handle acme-hook
 
-if [ -s /mnt/acme.hook ]; then
-  tar -C /acme.sh/ -xzf /mnt/acme.hook
+if [ -s /mnt/acme-hook ]; then
+  tar -C /acme.sh/ -xzf /mnt/acme-hook
 fi
 
 # register account, if necessary

@@ -1,126 +1,91 @@
 # kundk
 
-There are lots of [FIDO2](https://fidoalliance.org/fido2)/[WebAuthn](https://www.w3.org/TR/webauthn-2) demos out there.
-So what aspects are different with this one:
-
-* allows FIDO passkeys as 1st (for 1FA) or 2nd (for 2FA) factor
-  during authentication
-* employs LDAP during registration and as 1st (for 2FA) factor
-  during authentication
-* fully implemented with [Keycloak](https://github.com/keycloak/keycloak/blob/main/LICENSE.txt)
-* allows further integration via OIDC (and SAML)
-* implementation resides in eight OCI containers
-  (Keycloak, PostgreSQL, acme.sh, five Apaches for demos)
-* under Apache License (like Keycloak)
+This is a ready solution for employing Keycloak with FIDO2/WebAuthn and
+OIDC (or SAML). Demos are included.
 
 ## Demos
 
-All demos are accessible from a common landing page `https://$APACHE_HOSTNAME`;
-they allow removal of registrations and addition of authenticators in
-specific account consoles;
-and they allow read-only inspection of Keycloak configurations in specific realm admin
-consoles.
-
-| relying party (RP) | 1FA | 2FA |
+| relying party (RP) | 2FA | 1FA |
 | --- | :---: | :---: |
-| Apache `mod_auth_openidc` | ✅ | ✅ |
-| Apache `mod_shib` | ✅ | ✅ |
-| VMware vSphere | n/a | ✅ |
+| Apache (`mod_auth_openidc`) | demo #1 | demo #2 |
+| Apache (`mod_shib`) | demo #3 | demo #4 |
+| VMware vSphere | n/a | demo #6 |
 
-| demo | authentication | registration | user federation | protocol | OP | RP |
-| --- | --- | --- | --- | --- | --- | --- |
-| #1 | FIDO2 (1FA) | username/password | LDAP | OIDC | Keycloak | Apache ([`mod_auth_openidc`](https://github.com/OpenIDC/mod_auth_openidc)) |
-| #2 | username/password + FIDO2 (2FA) | username/password | LDAP | OIDC | Keycloak | Apache ([`mod_auth_openidc`](https://github.com/OpenIDC/mod_auth_openidc)) |
-| #3 | FIDO2 (1FA) | username/password | LDAP | SAML | Keycloak | Apache ([`mod_shib`](https://shibboleth.atlassian.net/wiki/spaces/SP3/pages/2065335062/Apache)) |
-| #4 | username/password + FIDO2 (2FA) | username/password | LDAP | SAML | Keycloak | Apache ([`mod_shib`](https://shibboleth.atlassian.net/wiki/spaces/SP3/pages/2065335062/Apache))) |
-| #6 | username/password + FIDO2 (2FA) | username/password | n/a | OIDC | Keycloak | vSphere ([ADFS provider](https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.authentication.doc/GUID-C5E998B2-1148-46DC-990E-A5DB71F93351.html)) |
+## Configuration
 
-### VMware vSphere
+### Build-time variables
 
-Configure vCenter Server Identity Provider Federation for ADFS as follows
-(tested with vSphere 8.1):
-
-| option | value |
-| --- | --- |
-| Base distinguished name for users | `cn=users,dc=$(echo $VSPHERE_DOMAIN \| sed 's/\./,dc=/g')` |
-| Base distinguished name for groups | `cn=users,dc=$(echo $VSPHERE_DOMAIN \| sed 's/\./,dc=/g')` |
-| Username | `cn=demo-6-client,cn=bind,dc=$(echo $VSPHERE_DOMAIN | sed 's/\./,dc=/g')` |
-| Password | client secret for client `demo-6-client` in realm `kundk-demo-6` |
-| Primary server URL | `ldaps://$KEYCLOAK_HOSTNAME:3893` |
-| Secondary server URL | n/a |
-| Certificates (for LDAPS) | n/a |
-| Identity provider name | `demo-6-client` |
-| Client identifier | `demo-6-client` |
-| Share secret | client secret for client `demo-6-client` in realm `kundk-demo-6` |
-| OpenID Address | `https://$KEYCLOAK_HOSTNAME:$KEYCLOAK_PORT/realms/kundk-demo-6/.well-known/openid-configuration` |
-
-## Installation
-
-```
-sudo apt-get install xinetd
-sudo sh -c "cat docs/xinetd.conf >> /etc/xinetd.d/services" # 1.
-sudo systemctl reload xinetd.service
-./scripts/build-base --no-cache
-./scripts/build-demo --no-cache
-cp docs/config.yaml .
-editor config.yaml #2
-./scripts/create-secrets #3
-./scripts/reset-volumes
-sudo loginctl enable-linger $(whoami)
-./scripts/start-base
-./scripts/start-base
-podman pod ps
-```
-
-1. The reference deployment uses Podman as container runtime and
-   `podman kube play` as orchestrator. Containers run in a rootless environment,
-   hence ports 80 and 443 must be redirected to unprivileged ports.
-2. see below
-3. Podman 4.3.1 requires workaround for issue
-   [#16269](https://github.com/containers/podman/issues/16269).
-
-(tested with Debian 12.1, Podman 4.3.1)
+| `ARG` | example | description |
+| --- | --- | --- |
+| `KEYCLOAK_DB` | `postgres` | RDB for Keycloak |
+| `KEYCLOAK_RELEASEVER` | 9 | release version of RHEL for Keycloak container |
+| `KEYCLOAK_VERSION`| `latest` | Keycloak version |
 
 ### Environment variables
 
+`kund` supports multiple tenants, e.g. both demos and production use cases.
+Their common configuration resides in environment variables.
+
+| `ENV` | | example |
+| --- | --- | --- |
+| `APP_IDS` | | `1 2 3 4 6` |
+| `KEYCLOAK_DB_URL` | | `jdbc:postgres://localhost/keycloak` |
+| `KEYCLOAK_DB_USERNAME` | | `keycloak` |
+| `KEYCLOAK_EMAIL` | | `me@mydomain.com` |
+| `KEYCLOAK_PORT` | 1. | 8444 |
+| `REALM_IDS` | | `1 2 3 4 6` |
+| `SMTP_SERVER` | | `mail.mydomain.com` |
+
+1. optional; default is `8444`
+
+The following environment variables are only required to support the demos.
+
 | env | | example |
 | --- | --- | --- |
-| `ACME_EMAIL` | | (email address) |
-| `ACME_SERVER` | 1. | `https://acme.zerossl.com/v2/DV90` |
-| `APACHE_EMAIL` | | (email address) |
-| `APACHE_HOSTNAME` | 2. | (FQDN) |
-| [`APACHE_LOG_LEVEL`](https://httpd.apache.org/docs/2.4/en/mod/core.html#loglevel) | 3. | `debug` |
-| `APP_IDS` | | `1 2 3 4 6` |
-| `KEYCLOAK_EMAIL` | | (email address) |
-| `KEYCLOAK_HOSTNAME` | 2. | (FQDN) |
-| [`KEYCLOAK_LOG_LEVEL`](https://www.keycloak.org/server/all-config?q=log-level) | 3. | `debug` |
+| `APACHE_EMAIL` | | `me@mydomain.com` |
+| [`APACHE_LOG_LEVEL`](https://httpd.apache.org/docs/2.4/en/mod/core.html#loglevel) | 1. | `debug` |
+| [`KEYCLOAK_LOG_LEVEL`](https://www.keycloak.org/server/all-config?q=log-level) | 1. | `debug` |
 | [`KEYCLOAK_OIDC_REMOTE_USER_CLAIM`](https://github.com/OpenIDC/mod_auth_openidc/blob/master/auth_openidc.conf) | | `given_name ^(.+?)(?:\s.+)?$ $1` |
-| [`KEYCLOAK_OIDC_SCOPE`](https://github.com/OpenIDC/mod_auth_openidc/blob/master/auth_openidc.conf) | | `openid profile`
-| `KEYCLOAK_PORT` | TODO | TODO |
-| `LDAP_SERVER` | 4. | `ldap://ldap.forumsys.com:389` |
-| `REALM_IDS` | | `1 2 3 4 6` |
-| `SMTP_SERVER` | | |
-| `VSPHERE_DOMAIN` | |
-| `VSPHERE_SERVER` | |
+| LDAP_PORT | | 3893 |
+| VSPHERE_DOMAIN | 2. | `mydomain.com` |
+| VSPHERE_SERVER | 2. | `https://vsphere.mydomain.com` |
 
-1. optional; default is `https://acme.zerossl.com/v2/DV90`
-2. optional; default is `$(hostname -f)`
-3. optional; default is `info`
-4. optional
+1. optional; default is `info`
+2. only required for demo #6
 
 ### Secrets
 
 | secret | keys | |
 | --- | --- | --- |
-| `acme-eab` | `hmac_key`, `kid` | 1. |
-| `keycloak-admin-password` | `password` | 2. |
-| `postgres-keycloak-password` | `password` | 3. |
-| `postgres-password` | `password` | 4. |
+| `keycloak-admin-password` | `password` | 1. |
+| `keycloak-db-password` | `password` | |
 
-1. leave empty for ACME HTTP Challenge instead of External Account Binding (EAB)
-2. password for user `admin` on Keycloak Administration Console
-3. password for PostgreSQL role `keycloak`
-4. password for PostgreSQL role `postgres`
+1. password for user `admin` on Keycloak Administration Console
+
+### Factory keys
+
+| key | description |
+| --- | --- |
+| `client_id` | see [`ClientRepresentation.id`](https://www.keycloak.org/docs-api/23.0.6/rest-api/index.html#ClientRepresentation) |
+| `display_name` | see [`RealmRepresentation.displayName`](https://www.keycloak.org/docs-api/23.0.6/rest-api/index.html#RealmRepresentation) |
+| `flow` | see [`AuthenticationFlowRepresentation.alias`](`https://www.keycloak.org/docs-api/latest/rest-api/index.html#AuthenticationFlowRepresentation) (`kundk-1fa` or `kundk-2fa`) |
+| `ldap_attribute_first_name` | |
+| `ldap_auth_type` | see [`UserFederationProviderRepresentation.config.authType`](https://www.keycloak.org/docs-api/23.0.6/rest-api/index.html#UserFederationProviderRepresentation) (for LDAP) |
+| `ldap_bind_credential` | |
+| `ldap_bind_dn` | see [`UserFederationProviderRepresentation.config.ldapBind`](https://www.keycloak.org/docs-api/23.0.6/rest-api/index.html#UserFederationProviderRepresentation) (for LDAP) |
+| `ldap_connection_url` | see [`UserFederationProviderRepresentation.config.connectionUrl`](https://www.keycloak.org/docs-api/23.0.6/rest-api/index.html#UserFederationProviderRepresentation) (for LDAP) |
+| `ldap_rdn_ldap_attribute` | |
+| `ldap_username_ldap_attribute` | |
+| `ldap_users_dn` | see [`UserFederationProviderRepresentation.config.userDn`](https://www.keycloak.org/docs-api/23.0.6/rest-api/index.html#UserFederationProviderRepresentation) (for LDAP) |
+| `ldap_user_object_class` | |
+| `ldap_uuid_ldap_attribute` | see [`UserFederationProviderRepresentation.config.uuidLDAPAttribute`](https://www.keycloak.org/docs-api/23.0.6/rest-api/index.html#UserFederationProviderRepresentation) |
+| `post_logout_redirect_uri` | see [`ClientRepresentation.attributes."post.logout.redirect.uris"`](https://www.keycloak.org/docs-api/23.0.6/rest-api/index.html#ClientRepresentation) (for OIDC) |
+| `protocol` | see [`ClientRepresentation.protocol`](https://www.keycloak.org/docs-api/23.0.6/rest-api/index.html#ClientRepresentation) |
+| `realm` | see [`RealmRepresentation.realm`](https://www.keycloak.org/docs-api/23.0.6/rest-api/index.html#RealmRepresentation) |
+| `redirect_uri` | [`ClientRepresentation.redirectUris`](https://www.keycloak.org/docs-api/23.0.6/rest-api/index.html#ClientRepresentation) (for OIDC) |
+| `saml_assertion_consumer_url_redirect` | |
+| `saml_single_logout_service_url_redirect` | |
+| `vsphere_domain` | AD domain |
 
 ## Frequently asked questions
 

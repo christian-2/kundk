@@ -2,6 +2,8 @@
 set -e
 trap 'echo "error: $0:$LINENO"' ERR
 
-cd $(dirname $0)/..
+[ $EUID -eq 0 ]
 
-podman kube play --down k8s/demo.yaml &> /dev/null || true
+for d in demo-{1,2,3,4,6} demo ldap; do
+	systemctl stop $d.service
+done
