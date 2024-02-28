@@ -14,4 +14,3 @@ EnvironmentFile=/opt/kundk/demo.env
 
 Secret=keycloak-admin-password,type=env,target=KEYCLOAK_ADMIN_PASSWORD
 Secret=keycloak-db-password,type=env,target=KEYCLOAK_DB_PASSWORD
-Secret=postgres-password,type=env,target=POSTGRES_PASSWORD
