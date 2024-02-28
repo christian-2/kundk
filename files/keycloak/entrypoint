@@ -1,6 +1,5 @@
 #!/bin/bash
 set -e
-set -x # TODO
 trap 'echo "error: $0:$LINENO"' ERR
 
 . /usr/local/bin/state
@@ -116,6 +115,16 @@ factory() {
   $factory $1 $2
 }
 
+bindAsBrowserFlow() {
+  [ $# -eq 2 ]
+  local realm=$1
+  local flow=$2
+
+  echo "binding flow $flow as reaml $realm's browser flow"
+  kcadm.sh update --config $config realms/$realm \
+    -s "browserFlow=$flow"
+}
+
 createExecution() {
   [ $# -eq 4 ]
   id=$(kcadm.sh create --config $config -r $1 -i \
@@ -138,6 +147,68 @@ createFlow() {
     -s builtIn=false \
     -s providerId=basic-flow \
     -s topLevel=true
+}
+
+createFlowAndSubflows() {
+  [ $# -eq 2 ]
+  local realm=$1
+  local flow=$2
+
+  case $flow in
+  kundk-1fa)
+    required_action=webauthn-register-passwordless
+
+    local subflow_1=$flow-subflow-1
+    local subflow_2=$flow-subflow-2
+    local subflow_3=$flow-subflow-3
+    local subflow_4=$flow-subflow-4
+
+    echo "creating flow $flow"
+    createFlow $realm $flow
+
+    echo "creating execution auth-cookie in $flow"
+    createExecution $realm $flow auth-cookie ALTERNATIVE
+    echo "creating subflow $subflow_1 in $flow"
+    createSubflow $realm $flow $subflow_1 ALTERNATIVE
+    echo "creating execution auth-username-form in $subflow_1"
+    createExecution $realm $subflow_1 auth-username-form REQUIRED
+    echo "creating subflow $subflow_2 in $subflow_1"
+    createSubflow $realm $subflow_1 $subflow_2 REQUIRED
+    echo "creating execution webauthn-authenticator-passwordless in " $subflow_2
+    createExecution $realm $subflow_2 webauthn-authenticator-passwordless \
+      ALTERNATIVE
+    echo "creating subflow $subflow_3 in $subflow_2"
+    createSubflow $realm $subflow_2 $subflow_3 ALTERNATIVE
+    echo "creating execution auth-password-form in $subflow_3"
+    createExecution $realm $subflow_3 auth-password-form REQUIRED
+    echo "creating subflow $subflow_4 in $subflow_3"
+    createSubflow $realm $subflow_3 $subflow_4 CONDITIONAL
+    echo "creating execution conditional-user-configured in $subflow_4"
+    createExecution $realm $subflow_4 conditional-user-configured REQUIRED
+    echo "creating execution webauthn-authenticator in $subflow_4"
+    createExecution $realm $subflow_4 webauthn-authenticator ALTERNATIVE
+    ;;
+  kundk-2fa)
+    required_action=webauthn-register
+
+    subflow_1=$flow-subflow-1
+
+    echo "creating flow $flow"
+    createFlow $realm $flow
+
+    echo "creating execution auth-cookie in $flow"
+    createExecution $realm $flow auth-cookie ALTERNATIVE
+    echo "creating subflow $subflow_1 in $flow"
+    createSubflow $realm $flow $subflow_1 ALTERNATIVE
+    echo "creating execution auth-username-password-form in $subflow_1"
+    createExecution $realm $subflow_1 auth-username-password-form REQUIRED
+    echo "creating execution webauthn-authenticator in $subflow_1"
+    createExecution $realm $subflow_1 webauthn-authenticator REQUIRED
+    ;;
+  *)
+    echo "unsupported flow: $flow"
+    exit 1
+  esac
 }
 
 createSubflow() {
@@ -288,62 +359,12 @@ for index in "${!app_ids[@]}"; do
       -s verifyEmail=true
   fi
 
+  # create hierarchy of flows
+
   flow=$(factory flow $app_id)
-  case $flow in
-  kundk-1fa)
-    required_action=webauthn-register-passwordless
+  createFlowAndSubflows $realm $flow
 
-    subflow_1=$flow-subflow-1
-    subflow_2=$flow-subflow-2
-    subflow_3=$flow-subflow-3
-    subflow_4=$flow-subflow-4
-
-    echo "creating flow $flow"
-    createFlow $realm $flow
-
-    echo "creating execution auth-cookie in $flow"
-    createExecution $realm $flow auth-cookie ALTERNATIVE
-    echo "creating subflow $subflow_1 in $flow"
-    createSubflow $realm $flow $subflow_1 ALTERNATIVE
-    echo "creating execution auth-username-form in $subflow_1"
-    createExecution $realm $subflow_1 auth-username-form REQUIRED
-    echo "creating subflow $subflow_2 in $subflow_1"
-    createSubflow $realm $subflow_1 $subflow_2 REQUIRED
-    echo "creating execution webauthn-authenticator-passwordless in " $subflow_2
-    createExecution $realm $subflow_2 webauthn-authenticator-passwordless \
-      ALTERNATIVE
-    echo "creating subflow $subflow_3 in $subflow_2"
-    createSubflow $realm $subflow_2 $subflow_3 ALTERNATIVE
-    echo "creating execution auth-password-form in $subflow_3"
-    createExecution $realm $subflow_3 auth-password-form REQUIRED
-    echo "creating subflow $subflow_4 in $subflow_3"
-    createSubflow $realm $subflow_3 $subflow_4 CONDITIONAL
-    echo "creating execution conditional-user-configured in $subflow_4"
-    createExecution $realm $subflow_4 conditional-user-configured REQUIRED
-    echo "creating execution webauthn-authenticator in $subflow_4"
-    createExecution $realm $subflow_4 webauthn-authenticator ALTERNATIVE
-    ;;
-  kundk-2fa)
-    required_action=webauthn-register
-
-    subflow_1=$flow-subflow-1
-
-    echo "creating flow $flow"
-    createFlow $realm $flow
-
-    echo "creating execution auth-cookie in $flow"
-    createExecution $realm $flow auth-cookie ALTERNATIVE
-    echo "creating subflow $subflow_1 in $flow"
-    createSubflow $realm $flow $subflow_1 ALTERNATIVE
-    echo "creating execution auth-username-password-form in $subflow_1"
-    createExecution $realm $subflow_1 auth-username-password-form REQUIRED
-    echo "creating execution webauthn-authenticator in $subflow_1"
-    createExecution $realm $subflow_1 webauthn-authenticator REQUIRED
-    ;;
-  *)
-    echo "unsupported flow: $flow"
-    exit 1
-  esac
+  # create appropriate client
 
   protocol=$(factory protocol $app_id)
   redirect_uri=$(factory redirect_uri $app_id)
@@ -469,19 +490,7 @@ EOF
     authentication/required-actions/$required_action \
     -s defaultAction=true
 
-  echo "binding flow $flow to client $client_id's browser flow"
-  flow_id=$(kcadm.sh get --config $config -r $realm \
-    authentication/flows |& \
-    jq -r --arg flow $flow \
-      '.[] | select(.alias == $flow) | .id')
-  [ -n "$flow_id" ]
-  id=$(kcadm.sh get --config $config -r $realm \
-    clients |& \
-    jq -r --arg clientId $client_id \
-      '.[] | select(.clientId == $clientId) | .id')
-  [ -n "$id" ]
-  kcadm.sh update --config $config -r $realm clients/$id \
-    -s 'authenticationFlowBindingOverrides={"browser":"'$flow_id'"}'
+  bindAsBrowserFlow $realm $flow
 
   if [ -n "$ldap_connection_url" ]; then
     echo "ldap_connection_url=$ldap_connection_url"
@@ -571,6 +580,10 @@ EOF
     --cclientid realm-management \
     --rolename view-realm --rolename view-clients
 done
+
+# bind flow for 2FA also as browser flow to realm master
+createFlowAndSubflows master kundk-2fa
+bindAsBrowserFlow master kundk-2fa
 
 # import from or export to clients.json
 
