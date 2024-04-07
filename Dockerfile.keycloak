@@ -1,4 +1,4 @@
-ARG KEYCLOAK_VERSION=24.0.0
+ARG KEYCLOAK_VERSION=24.0.2
 ARG KEYCLOAK_RELEASEVER=9
 FROM registry.access.redhat.com/ubi${KEYCLOAK_RELEASEVER}/ubi AS package-builder
 ARG KEYCLOAK_RELEASEVER=9
@@ -83,4 +83,4 @@ VOLUME /mnt/state
 COPY --chmod=755 files/keycloak/entrypoint files/keycloak/demos /
 ENTRYPOINT ["/entrypoint"]
 RUN [ -f /opt/keycloak/conf/keycloak.conf ]
-CMD ["start", "--optimized" ]
+CMD ["start", "--optimized"]
