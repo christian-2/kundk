@@ -42,8 +42,10 @@ COPY --from=provider-builder \
   /opt/keycloak/providers/
 
 ARG KEYCLOAK_DB
+ARG KEYCLOAK_FEATURES
 RUN /opt/keycloak/bin/kc.sh build \
     --db ${KEYCLOAK_DB} \
+    ${KEYCLOAK_FEATURES:+--features }${KEYCLOAK_FEATURES} \
     --health-enabled=true && \
   /opt/keycloak/bin/kc.sh show-config
 
